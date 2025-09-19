@@ -247,18 +247,20 @@
       let chartInstance = null,
         allData = {},
         latestRateMap = {};
+
+      /* === 日志 === */
       function loadLogs() {
         fetch("/api/logs/latest")
           .then((res) => res.json())
           .then((data) => {
-            const logLines = data.log.split("\n");
+            const logLines = (data.log || "").split("\n");
             const container = document.getElementById("logContainer");
             container.innerHTML = "";
 
             const importantLevels = ["INFO", "WARNING", "ERROR", "CRITICAL"];
             let traceId = null;
 
-            // 找到最新一次抓取任务的 trace_id（含 "开始抓取人民币兑换"）
+            // 找到最近一次抓取任务 trace_id（含 "开始抓取人民币兑换"）
             for (let i = logLines.length - 1; i >= 0; i--) {
               const line = logLines[i];
               if (line.includes("开始抓取人民币兑换")) {
@@ -275,7 +277,7 @@
               return;
             }
 
-            // 展示该 trace_id 下所有日志（只筛选重要级别）
+            // 展示该 trace_id 下所有日志（筛选重要级别）
             logLines.forEach((line) => {
               if (
                 line.includes(`[${traceId}]`) &&
@@ -294,9 +296,14 @@
             });
 
             container.scrollTop = container.scrollHeight;
+          })
+          .catch(() => {
+            const container = document.getElementById("logContainer");
+            container.textContent = "⚠️ 日志加载失败。";
           });
       }
 
+      /* === 最新汇率表格 & 换算 === */
       function loadLatestRates() {
         fetch("/api/latest")
           .then((res) => res.json())
@@ -308,20 +315,25 @@
               latestRateMap[row.Currency] = row.Rate;
               const tr = document.createElement("tr");
               tr.innerHTML = `
-              <td>${row.Date}</td>
-              <td>${flagMap[row.Currency] || ""} ${
+                <td>${row.Date}</td>
+                <td>${flagMap[row.Currency] || ""} ${
                 currencyNameMap[row.Currency] || row.Currency
               }</td>
-              <td>${row.Rate}</td>
-              <td>${
-                row.PredictedRate !== null
-                  ? row.PredictedRate.toFixed(4)
-                  : "N/A"
-              }</td>
-              <td>${row.PredictionDate || "—"}</td>`;
+                <td>${row.Rate}</td>
+                <td>${
+                  row.PredictedRate !== null
+                    ? Number(row.PredictedRate).toFixed(4)
+                    : "N/A"
+                }</td>
+                <td>${row.PredictionDate || "—"}</td>`;
               tbody.appendChild(tr);
             });
             setupCnyConverter(data);
+          })
+          .catch(() => {
+            const tbody = document.querySelector("#rateTable tbody");
+            tbody.innerHTML =
+              '<tr><td colspan="5" style="color:#888">加载失败</td></tr>';
           });
       }
 
@@ -344,20 +356,21 @@
           )
           .join("");
 
-        select.value = "AUD";
+        if (rates.AUD) select.value = "AUD";
 
         function updateDisplay() {
           const cur = select.value;
+          // 你的数据似乎是“100外币兑CNY”？保留 /100 的换算；如非此约定，可去掉 /100
           const rate = rates[cur] / 100;
           const amount =
             parseFloat(document.getElementById("sourceAmount").value) || 0;
           const cnyValue = amount * rate;
           document.getElementById("convertedCny").value = cnyValue.toFixed(4);
           summary.innerHTML = `
-          <div>1 ${currencyNameMap[cur] || cur} ≈ ${rate.toFixed(
+            <div>1 ${currencyNameMap[cur] || cur} ≈ ${rate.toFixed(
             4
           )} 人民币</div>
-          <div>1 人民币 ≈ ${(1 / rate).toFixed(4)} ${
+            <div>1 人民币 ≈ ${(1 / rate).toFixed(4)} ${
             currencyNameMap[cur] || cur
           }</div>`;
         }
@@ -374,50 +387,71 @@
         updateDisplay();
       }
 
+      /* === 历史+预测图 === */
       function loadChartData() {
         fetch("/api/history/chart")
           .then((res) => res.json())
           .then((data) => {
-            allData = data;
+            allData = data || {};
             const select = document.getElementById("currencySelect");
-            select.innerHTML = Object.keys(data)
+            const keys = Object.keys(allData).sort();
+            select.innerHTML = keys
               .map(
                 (k) =>
-                  `<option value="${k}">${currencyNameMap[k] || k}</option>`
+                  `<option value="${k}">${flagMap[k] || ""} ${
+                    currencyNameMap[k] || k
+                  }</option>`
               )
               .join("");
+            if (keys.length) {
+              select.value = keys.includes("AUD") ? "AUD" : keys[0];
+            }
+            updateChart();
+          })
+          .catch(() => {
+            allData = {};
+            const select = document.getElementById("currencySelect");
+            select.innerHTML = `<option value="">加载失败</option>`;
             updateChart();
           });
       }
 
       function updateChart() {
         const currency = document.getElementById("currencySelect").value;
-        const data = allData[currency] || [];
+        const rowsRaw = (allData && allData[currency]) || [];
+
+        // 仅显示最近 2 天
         const now = new Date();
         const windowStart = new Date(now.getTime() - 2 * 86400000);
-        const filtered = data.filter(
-          (d) => new Date(d.datetime) >= windowStart
+
+        // 先排序（保证时间轴有序），再窗口筛选
+        const rows = rowsRaw
+          .slice()
+          .sort(
+            (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+          )
+          .filter((r) => new Date(r.datetime) >= windowStart);
+
+        const labels = rows.map((d) => d.datetime);
+
+        // 历史线：rate 有值；预测线：predicted 有值
+        const historyRates = rows.map((d) =>
+          d.rate !== null && d.rate !== undefined ? d.rate : null
         );
-        const historyOnly = filtered.filter((d) => d.rate !== null);
-        const predictionOnly = filtered.filter(
-          (d) => d.rate === null && d.predicted !== null
-        );
-        const combined = [...historyOnly, ...predictionOnly];
-        const labels = combined.map((d) => d.datetime);
-        const historyRates = combined.map((d) =>
-          d.rate !== null ? d.rate : null
-        );
-        const predictionRates = combined.map((d) =>
-          d.rate === null && d.predicted !== null ? d.predicted : null
+        const predictionRates = rows.map((d) =>
+          d.predicted !== null && d.predicted !== undefined ? d.predicted : null
         );
 
-        const lastHistIndex = historyRates
-          .map((v, i) => (v !== null ? i : -1))
-          .filter((i) => i !== -1)
-          .pop();
+        // 连接线：只在“最后一个历史点”和“第一个预测点”处取值，其他为 null
+        const lastHistIndex = (() => {
+          for (let i = historyRates.length - 1; i >= 0; i--) {
+            if (historyRates[i] !== null) return i;
+          }
+          return -1;
+        })();
         const firstPredIndex = predictionRates.findIndex((v) => v !== null);
-        const connectorData = new Array(combined.length).fill(null);
-        if (lastHistIndex !== undefined && firstPredIndex !== -1) {
+        const connectorData = new Array(rows.length).fill(null);
+        if (lastHistIndex !== -1 && firstPredIndex !== -1) {
           connectorData[lastHistIndex] = historyRates[lastHistIndex];
           connectorData[firstPredIndex] = predictionRates[firstPredIndex];
         }
@@ -427,7 +461,7 @@
         chartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: labels,
+            labels,
             datasets: [
               {
                 label: `${currencyNameMap[currency] || currency} 历史汇率`,
@@ -436,6 +470,8 @@
                 backgroundColor: "rgba(75, 192, 192, 0.1)",
                 fill: true,
                 tension: 0.2,
+                pointRadius: 0,
+                spanGaps: true,
               },
               {
                 label: `${currencyNameMap[currency] || currency} 预测汇率`,
@@ -444,20 +480,12 @@
                 borderDash: [6, 6],
                 pointBackgroundColor: "rgba(255, 99, 132, 1)",
                 pointStyle: "circle",
-                pointRadius: 4,
-                fill: false,
-                tension: 0,
-              },
-              {
-                label: "连接线",
-                data: connectorData,
-                borderColor: "rgba(128, 128, 128, 0.5)",
-                borderDash: [3, 3],
-                pointRadius: 0,
+                pointRadius: 4, // 单点也明显
                 fill: false,
                 tension: 0,
                 spanGaps: true,
               },
+
             ],
           },
           options: {
@@ -467,7 +495,15 @@
               tooltip: {
                 callbacks: {
                   title: (ctx) => `时间：${ctx[0].label}`,
-                  label: (ctx) => `${ctx.dataset.label}：${ctx.formattedValue}`,
+                  label: (ctx) => {
+                    const val =
+                      ctx.parsed && typeof ctx.parsed.y === "number"
+                        ? ctx.parsed.y
+                        : null;
+                    return `${ctx.dataset.label}：${
+                      val === null ? "-" : String(val)
+                    }`;
+                  },
                 },
               },
               legend: {
@@ -488,10 +524,8 @@
             },
             scales: {
               x: {
-                min: labels.length > 10 ? labels.length - 10 : 0,
-                max: labels.length - 1,
                 title: { display: true, text: "时间" },
-                ticks: { display: false },
+                ticks: { autoSkip: true, maxTicksLimit: 10 },
               },
               y: {
                 title: { display: true, text: "汇率" },
@@ -502,6 +536,7 @@
         });
       }
 
+      /* === 启动 === */
       window.onload = function () {
         loadLatestRates();
         loadChartData();

@@ -221,65 +221,54 @@ def get_latest_rates():
 
 @main.route("/api/history/chart", methods=["GET"])
 def api_history_chart():
-    logger.info("访问了 /api/history/chart 获取历史+预测数据")
+    logger.info("访问了 /api/history/chart 获取当日历史+预测数据")
     session = Session()
     try:
         now = datetime.now()
-        since = now - timedelta(days=30)
+        today_start = datetime(now.year, now.month, now.day)  # 当天 00:00:00
 
-        # 读取历史记录
-        history_rows = session.query(History).filter(History.Date >= since).all()
-        from sqlalchemy.sql import func
-
-        # 获取每种货币的最早一条未来预测
-        subq = (
-            session.query(
-                Prediction.Currency,
-                func.min(Prediction.Date).label("min_date")
-            )
-            .filter(Prediction.Date >= datetime.now())
-            .group_by(Prediction.Currency)
-            .subquery()
-        )
-
-        prediction_rows = (
-            session.query(Prediction)
-            .join(subq, (Prediction.Currency == subq.c.Currency) & (Prediction.Date == subq.c.min_date))
+        # 历史（当天到此刻）
+        history_rows = (
+            session.query(History)
+            .filter(History.Date >= today_start, History.Date <= now)
             .all()
         )
-        
-        # 整理为 Currency -> datetime -> value
-        from collections import defaultdict
 
+        # 预测（当天到此刻，不包含未来）
+        prediction_rows = (
+            session.query(Prediction)
+            .filter(Prediction.Date >= today_start, Prediction.Date <= now)
+            .all()
+        )
+
+        from collections import defaultdict
         history_map = defaultdict(dict)
         for row in history_rows:
-            timestamp = row.Date.replace(second=0, microsecond=0)
-            history_map[row.Currency][timestamp] = row.Rate
+            ts = row.Date.replace(second=0, microsecond=0)
+            history_map[row.Currency][ts] = row.Rate
 
         prediction_map = defaultdict(dict)
         for row in prediction_rows:
-            timestamp = row.Date.replace(second=0, microsecond=0)
-            prediction_map[row.Currency][timestamp] = row.Predicted_rate
+            ts = row.Date.replace(second=0, microsecond=0)
+            prediction_map[row.Currency][ts] = row.Predicted_rate
 
-        # 汇总所有时间点
         response = {}
-        for currency in set(list(history_map.keys()) + list(prediction_map.keys())):
-            all_times = sorted(set(history_map[currency].keys()) | set(prediction_map[currency].keys()))
+        for cur in set(list(history_map.keys()) + list(prediction_map.keys())):
+            all_times = sorted(set(history_map[cur].keys()) | set(prediction_map[cur].keys()))
             merged = []
             for dt in all_times:
-                rate = history_map[currency].get(dt)
-                predicted = None if rate is not None else prediction_map[currency].get(dt)
                 merged.append({
                     "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
-                    "rate": rate,
-                    "predicted": predicted
+                    "rate": history_map[cur].get(dt),
+                    "predicted": prediction_map[cur].get(dt)
                 })
-            response[currency] = merged
+            response[cur] = merged
 
         return jsonify(response)
-
     finally:
         session.close()
+
+
         
 @main.route("/history", methods=["GET"])
 def history_page():
