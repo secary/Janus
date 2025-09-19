@@ -1,0 +1,6 @@
+beautifulsoup4==4.13.4
+loguru==0.7.3
+pandas==2.3.0
+SQLAlchemy==2.0.35
+pymysql
+python-dotenv==1.1.0
