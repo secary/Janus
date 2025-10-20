@@ -7,7 +7,7 @@ WORKDIR /Javelin
 RUN apt-get update && apt-get install -y tzdata
 ENV TZ=Australia/Adelaide
 
-COPY Janus-dockers/requirements/javelin.txt /Javelin/requirements.txt
+COPY requirements.txt /Javelin/requirements.txt
 RUN pip install --no-cache-dir -r /Javelin/requirements.txt
 
 # 拷贝网站代码和模板

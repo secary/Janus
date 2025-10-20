@@ -1,0 +1,15 @@
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./dockerfile.javelin
+    image: javelin
+    container_name: web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/Javelin/logs
+    env_file:
+      - .env.prod
+    restart: always
