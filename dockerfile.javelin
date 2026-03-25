@@ -4,8 +4,7 @@ FROM python:3.12-slim
 # 设置工作目录
 WORKDIR /Javelin
 
-RUN apt-get update && apt-get install -y tzdata
-ENV TZ=Australia/Adelaide
+RUN apt-get update
 
 COPY web/requirements.txt /Javelin/requirements.txt
 RUN pip install --upgrade pip \

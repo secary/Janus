@@ -2,9 +2,9 @@
 
 # 固定路径
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="$BASE_DIR/logs"
-LOG_FILE="$LOG_DIR/Jervis.log"
-mkdir -p "$LOG_DIR"
+# LOG_DIR="$BASE_DIR/logs"
+# LOG_FILE="$LOG_DIR/Jervis.log"
+# mkdir -p "$LOG_DIR"
 
 SCRIPT_NAME="$(basename "$0")"
 
@@ -20,15 +20,15 @@ export TRACE_ID_JERVIS
 log() {
   local level="$1"
   local msg="$2"
-  local timestamp="$(date '+%Y-%m-%d %H:%M:%S,%3N')"
+  local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
   local line="$timestamp [$level] $SCRIPT_NAME [$TRACE_ID_JERVIS]: $msg"
-  echo "$line" | tee -a "$LOG_FILE"
+  echo "$line" 
 }
 
 log INFO "⏰ 启动预测任务"
 
 # ✅ 静默运行 Python，只由 loguru 写入 Jervis.log
-PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12"
+PYTHON_BIN="/opt/homebrew/bin/python3.12"
 PYTHONUNBUFFERED=1 "${PYTHON_BIN}" "$BASE_DIR/predictor/Jervis.py"
 
 STATUS=$?

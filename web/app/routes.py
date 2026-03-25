@@ -6,6 +6,7 @@ import os
 import uuid
 from loguru import logger
 from config.logger_config import trace_ids
+from flask import g
 
 # 设置 trace_id（适用于主进程或脚本执行）
 trace_id = os.getenv("TRACE_ID_JAVELIN") or f"JAVELIN-{uuid.uuid4()}"
@@ -13,7 +14,6 @@ trace_ids["javelin"].set(trace_id)
 
 # 绑定 loguru logger（确保日志输出至 Javelin.log）
 logger = logger.bind(name="javelin")
-
 
 from flask import Blueprint, jsonify, request, render_template
 # from main.fetcher import get_exchange_rate
@@ -28,23 +28,26 @@ import re
 main = Blueprint("main", __name__)
 Session = sessionmaker(bind=get_engine())
 
+def get_log():
+    trace_id = getattr(g, "trace_id", None)
+
+    if not trace_id:
+        trace_id = f"JAVELIN-{uuid.uuid4()}"
+        trace_ids["javelin"].set(trace_id)
+        g.trace_id = trace_id
+
+    return logger.bind(name="javelin", trace_id=trace_id)
+
 @main.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
-
-# @main.route("/api/fetch", methods=["POST"])
-# def api_fetch():
-#     logger.info("触发 /api/fetch 抓取汇率数据")
-#     try:
-#         data = get_exchange_rate(WEBSITE, CURRENCIES)
-#         store_data(data)
-#         return jsonify({"message": "抓取并存储成功", "data": data})
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
     
 @main.route("/api/history", methods=["GET"])
 def api_history():
-    logger.info("访问了 /api/history 查看历史记录")
+    
+    log = get_log()
+    log.info("访问了 /api/history 查看历史记录")
+    
     session = Session()
     try:
         currency = request.args.get("currency")
@@ -66,40 +69,42 @@ def api_history():
 
 @main.route("/api/logs/latest", methods=["GET"])
 def api_logs_latest():
-    logger.info("访问了 /api/logs/latest 查看最近一小时日志")
-    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-    LOG_DIR = os.path.join(BASE_DIR, "logs")
-    LOG_FILE = os.path.join(LOG_DIR, "Janus.log")
+    log = get_log()
+    log.info("访问了 /api/logs/latest 查看最新爬虫日志")
 
-    time_threshold = datetime.now() - timedelta(hours=1)
-    log_pattern = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+    from sqlalchemy import text
+    session = Session()
 
     try:
-        recent_lines = []
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            for line in reversed(f.readlines()):
-                match = log_pattern.match(line)
-                if match:
-                    log_time = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
-                    if log_time >= time_threshold:
-                        recent_lines.insert(0, line)
-                    else:
-                        break  # 因为是从后往前读，可以提前结束
-                else:
-                    # 如果没有时间戳，视为日志附属行（追加）
-                    if recent_lines:
-                        recent_lines.insert(0, line)
+        rows = session.execute(
+            text("""
+                SELECT timestamp, level, message
+                FROM logs
+                WHERE source = 'janus'   -- ⭐关键
+                ORDER BY timestamp DESC
+                LIMIT 50
+            """)
+        ).fetchall()
 
-        logger.info(f"读取过去1小时内的日志，共 {len(recent_lines)} 条")
-        return jsonify({"log": "".join(recent_lines)})
+        # 倒序改正（让前端从旧到新显示）
+        rows = rows[::-1]
 
-    except Exception as e:
-        logger.error(f"读取日志文件失败: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify([
+            {
+                "timestamp": r[0],
+                "level": r[1],
+                "message": r[2]
+            }
+            for r in rows
+        ])
+
+    finally:
+        session.close()
 
 @main.route("/api/config", methods=["GET"])
 def api_config_get():
-    logger.info("访问了 /api/config 查看监控配置")
+    log = get_log()
+    log.info("访问了 /api/config 查看监控配置")
     session = Session()
     try:
         thresholds = session.query(Threshold).all()
@@ -112,7 +117,8 @@ def api_config_get():
 
 @main.route("/api/config", methods=["POST"])
 def api_config_post():
-    logger.info("访问了 /api/config 更新监控配置")
+    log = get_log()
+    log.info("访问了 /api/config 更新监控配置")
     data = request.get_json()
     if not data or "Currency" not in data:
         logger.error("请求中缺少 Currency 字段")
@@ -132,7 +138,7 @@ def api_config_post():
             )
             session.add(t)
         session.commit()
-        logger.info(f"更新了 {t.Currency} 的监控配置: 上限 {t.Upper}, 下限 {t.Lower}")
+        log.info(f"更新了 {t.Currency} 的监控配置: 上限 {t.Upper}, 下限 {t.Lower}")
         return jsonify({"message": "配置已更新", "Currency": t.Currency, "Upper": t.Upper, "Lower": t.Lower})
     except Exception as e:
         session.rollback()
@@ -143,7 +149,7 @@ def api_config_post():
 
 # @main.route("/api/switch/status", methods=["GET"])
 # def get_switch_status():
-#     logger.info("访问了 /api/switch/status 获取当前自动化状态")
+#     log.info("访问了 /api/switch/status 获取当前自动化状态")
 #     session = Session()
 #     try:
 #         switch = session.query(AutomationSwitch).filter_by(key="auto_enabled").first()
@@ -155,7 +161,7 @@ def api_config_post():
 
 # @main.route("/api/switch/toggle", methods=["POST"])
 # def toggle_switch():
-#     logger.info("访问了 /api/switch/toggle 切换自动化状态")
+#     log.info("访问了 /api/switch/toggle 切换自动化状态")
 #     session = Session()
 #     try:
 #         switch = session.query(AutomationSwitch).filter_by(key="auto_enabled").first()
@@ -166,7 +172,7 @@ def api_config_post():
 #             session.add(switch)
 #         session.commit()
 #         status_str = "开启" if switch.value else "关闭"
-#         logger.info(f"✅ 自动化开关已设置为：{status_str}")
+#         log.info(f"✅ 自动化开关已设置为：{status_str}")
 #         return jsonify({"status": status_str})
 #     except Exception as e:
 #         session.rollback()
@@ -177,7 +183,8 @@ def api_config_post():
 
 @main.route("/api/latest", methods=["GET"])
 def get_latest_rates():
-    logger.info("访问了 /api/latest 获取最新汇率")
+    log = get_log()
+    log.info("访问了 /api/latest 获取最新汇率")
     session = Session()
     try:
         # 1️⃣ 获取每种货币的最新一条历史记录
@@ -221,7 +228,8 @@ def get_latest_rates():
 
 @main.route("/api/history/chart", methods=["GET"])
 def api_history_chart():
-    logger.info("访问了 /api/history/chart 获取当日历史+预测数据")
+    log = get_log()
+    log.info("访问了 /api/history/chart 获取当日历史+预测数据")
     session = Session()
     try:
         now = datetime.now()

@@ -1,5 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean
+from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean, Text, JSON, BigInteger
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -39,3 +40,35 @@ class Prediction(Base):
     Predicted_rate = Column(Float, nullable=False)
     Locals = Column(String(50))
     
+class Logs(Base):
+    __tablename__ = "logs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+
+    # 基础字段
+    timestamp = Column(DateTime)
+    level = Column(String(20))
+
+    trace_id = Column(String(100))
+    module = Column(String(100))
+    source = Column(String(50))       # janus / javelin / jervis
+    log_type = Column(String(20))     # system / request / job
+
+    message = Column(Text)
+
+    # request 专用
+    method = Column(String(10))
+    path = Column(String(255))
+    ip = Column(String(50))
+    status_code = Column(Integer)
+    latency_ms = Column(Integer)
+
+    # job 专用
+    job_name = Column(String(100))
+    script = Column(String(100))
+    exit_code = Column(Integer)
+
+    # 扩展
+    extra = Column(JSON)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

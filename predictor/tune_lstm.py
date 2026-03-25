@@ -8,10 +8,11 @@ from config.logger_config import trace_ids
 
 # ✅ 绑定 loguru 的 name 字段，用于日志分类输出
 script_name = os.path.splitext(os.path.basename(__file__))[0]
-logger = logger.bind(name="jervis", display=script_name)
+
 # 设置 trace_id（独立运行时使用 uuid；也支持从环境变量传入）
 trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"
 trace_ids["jervis"].set(trace_id)
+logger = logger.bind(name="jervis", trace_id=trace_id, display=script_name)
 
 import torch
 from sklearn.metrics import mean_squared_error

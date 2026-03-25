@@ -17,17 +17,22 @@ def create_app():
 
     @app.before_request
     def log_request_info():
-        trace_id = request.headers.get("X-Trace-ID") or f"JAVELIN-{uuid.uuid4()}"
-        g.trace_id = trace_id
-        trace_ids["javelin"].set(trace_id)
+        trace_id = f"JAVELIN-{uuid.uuid4()}"
+        trace_ids["javelin"].set(trace_id)  # 或 web
 
-        logger.bind(trace_id=trace_id).info(f"🌐 收到请求: {request.method} {request.path} 来自 {request.remote_addr}")
+        g.trace_id = trace_id
+
+        logger.bind(name="javelin", trace_id=trace_id).info(
+            f"🌐 请求 {request.method} {request.path} 来自 {request.remote_addr}"
+        )
 
     @app.after_request
     def log_response_info(response):
-        trace_id = g.get("trace_id", "-")
-        logger.bind(trace_id=trace_id).info(f"📤 响应状态: {response.status}")
-        response.headers["X-Trace-ID"] = trace_id
+        trace_id = getattr(g, "trace_id", "-")
+
+        logger.bind(name="javelin", trace_id=trace_id).info(
+            f"📤 响应 {response.status}"
+        )
         return response
 
     return app

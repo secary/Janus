@@ -2,9 +2,9 @@
 
 # 项目根目录
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="$BASE_DIR/logs"
-LOG_FILE="$LOG_DIR/Janus.log"
-mkdir -p "$LOG_DIR"
+# LOG_DIR="$BASE_DIR/logs"
+# LOG_FILE="$LOG_DIR/Janus.log"
+# mkdir -p "$LOG_DIR"
 
 SCRIPT_NAME="$(basename "$0")"
 
@@ -19,13 +19,13 @@ export TRACE_ID_JANUS
 log() {
   local level="$1"
   local message="$2"
-  local timestamp="$(date '+%Y-%m-%d %H:%M:%S,%3N')"
-  echo "$timestamp [$level] $SCRIPT_NAME [${TRACE_ID_JANUS}]: $message" | tee -a "$LOG_FILE"
+  local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  echo "$timestamp [$level] $SCRIPT_NAME [${TRACE_ID_JANUS}]: $message" 
 }
 
 log INFO "🔁 启动自动化任务"
 
-PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12"
+PYTHON_BIN="/opt/homebrew/bin/python3.12"
 
 PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$BASE_DIR/main/Janus.py"
 STATUS=$?

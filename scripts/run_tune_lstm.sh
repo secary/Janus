@@ -2,9 +2,9 @@
 
 # 固定路径
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="$BASE_DIR/logs"
-LOG_FILE="$LOG_DIR/Jervis.log"
-mkdir -p "$LOG_DIR"
+# LOG_DIR="$BASE_DIR/logs"
+# LOG_FILE="$LOG_DIR/Jervis.log"
+# mkdir -p "$LOG_DIR"
 
 # 获取当前脚本文件名
 SCRIPT_NAME="$(basename "$0")"
@@ -21,13 +21,13 @@ export TRACE_ID_JERVIS
 log() {
   local level="$1"
   local msg="$2"
-  local timestamp="$(date '+%Y-%m-%d %H:%M:%S,%3N')"
+  local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
   local line="$timestamp [$level] $SCRIPT_NAME [$TRACE_ID_JERVIS]: $msg"
-  echo "$line" | tee -a "$LOG_FILE"
+  echo "$line" 
 }
 
 log INFO "🧪 开始调参任务"
-PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12"
+PYTHON_BIN="/opt/homebrew/bin/python3.12"
 PYTHONUNBUFFERED=1 "${PYTHON_BIN}" "$BASE_DIR/predictor/tune_lstm.py"
 STATUS=$?
 

@@ -10,7 +10,7 @@ trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"
 trace_ids["jervis"].set(trace_id)
 
 # ✅ 绑定 loguru 的 name 字段，用于日志分类输出
-logger = logger.bind(name="jervis")
+logger = logger.bind(name="jervis",trace_id=trace_id)
 
 # 获取项目根目录（Jervis.py 所在目录的上一级）
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

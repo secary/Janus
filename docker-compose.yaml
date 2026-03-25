@@ -8,8 +8,6 @@ services:
     container_name: web
     ports:
       - "5024:5000"
-    volumes:
-      - ./logs:/Javelin/logs
     env_file:
       - .env.prod
     restart: always
