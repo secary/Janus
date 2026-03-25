@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh">
   <head>
     <meta charset="UTF-8" />
@@ -248,51 +248,30 @@
         allData = {},
         latestRateMap = {};
 
-      /* === 日志 === */
       function loadLogs() {
         fetch("/api/logs/latest")
           .then((res) => res.json())
           .then((data) => {
-            const logLines = (data.log || "").split("\n");
             const container = document.getElementById("logContainer");
             container.innerHTML = "";
 
-            const importantLevels = ["INFO", "WARNING", "ERROR", "CRITICAL"];
-            let traceId = null;
-
-            // 找到最近一次抓取任务 trace_id（含 "开始抓取人民币兑换"）
-            for (let i = logLines.length - 1; i >= 0; i--) {
-              const line = logLines[i];
-              if (line.includes("开始抓取人民币兑换")) {
-                const match = line.match(/\[(JANUS-[^\]]+)\]/);
-                if (match) {
-                  traceId = match[1];
-                  break;
-                }
-              }
-            }
-
-            if (!traceId) {
-              container.textContent = "⚠️ 未找到最近的爬虫任务 trace_id。";
+            if (!data || data.length === 0) {
+              container.textContent = "⚠️ 暂无爬虫日志";
               return;
             }
 
-            // 展示该 trace_id 下所有日志（筛选重要级别）
-            logLines.forEach((line) => {
-              if (
-                line.includes(`[${traceId}]`) &&
-                importantLevels.some((level) => line.includes(`[${level}]`))
-              ) {
-                const div = document.createElement("div");
-                div.textContent = line;
+            data.forEach((row) => {
+              const div = document.createElement("div");
 
-                if (line.includes("[ERROR]")) div.style.color = "red";
-                else if (line.includes("[WARNING]")) div.style.color = "orange";
-                else if (line.includes("[CRITICAL]"))
-                  div.style.color = "purple";
+              const line = `[${row.timestamp}] [${row.level}] ${row.message}`;
+              div.textContent = line;
 
-                container.appendChild(div);
-              }
+              // 颜色（保留你的风格）
+              if (row.level === "ERROR") div.style.color = "red";
+              else if (row.level === "WARNING") div.style.color = "orange";
+              else if (row.level === "CRITICAL") div.style.color = "purple";
+
+              container.appendChild(div);
             });
 
             container.scrollTop = container.scrollHeight;
@@ -317,8 +296,8 @@
               tr.innerHTML = `
                 <td>${row.Date}</td>
                 <td>${flagMap[row.Currency] || ""} ${
-                currencyNameMap[row.Currency] || row.Currency
-              }</td>
+                  currencyNameMap[row.Currency] || row.Currency
+                }</td>
                 <td>${row.Rate}</td>
                 <td>${
                   row.PredictedRate !== null
@@ -352,7 +331,7 @@
             (cur) =>
               `<option value="${cur}">${flagMap[cur] || ""} ${
                 currencyNameMap[cur] || cur
-              }</option>`
+              }</option>`,
           )
           .join("");
 
@@ -368,11 +347,11 @@
           document.getElementById("convertedCny").value = cnyValue.toFixed(4);
           summary.innerHTML = `
             <div>1 ${currencyNameMap[cur] || cur} ≈ ${rate.toFixed(
-            4
-          )} 人民币</div>
+              4,
+            )} 人民币</div>
             <div>1 人民币 ≈ ${(1 / rate).toFixed(4)} ${
-            currencyNameMap[cur] || cur
-          }</div>`;
+              currencyNameMap[cur] || cur
+            }</div>`;
         }
 
         document
@@ -400,7 +379,7 @@
                 (k) =>
                   `<option value="${k}">${flagMap[k] || ""} ${
                     currencyNameMap[k] || k
-                  }</option>`
+                  }</option>`,
               )
               .join("");
             if (keys.length) {
@@ -428,7 +407,8 @@
         const rows = rowsRaw
           .slice()
           .sort(
-            (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+            (a, b) =>
+              new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
           )
           .filter((r) => new Date(r.datetime) >= windowStart);
 
@@ -436,10 +416,12 @@
 
         // 历史线：rate 有值；预测线：predicted 有值
         const historyRates = rows.map((d) =>
-          d.rate !== null && d.rate !== undefined ? d.rate : null
+          d.rate !== null && d.rate !== undefined ? d.rate : null,
         );
         const predictionRates = rows.map((d) =>
-          d.predicted !== null && d.predicted !== undefined ? d.predicted : null
+          d.predicted !== null && d.predicted !== undefined
+            ? d.predicted
+            : null,
         );
 
         // 连接线：只在“最后一个历史点”和“第一个预测点”处取值，其他为 null
@@ -485,7 +467,6 @@
                 tension: 0,
                 spanGaps: true,
               },
-
             ],
           },
           options: {
