@@ -4,6 +4,7 @@ loguru==0.7.3
 numpy==2.4.3
 pandas==3.0.1
 python-dotenv==1.2.2
-scikit_learn==1.8.0
 SQLAlchemy==2.0.35
-torch==2.7.0
+cryptography
+pymysql
+torch

@@ -28,7 +28,7 @@ log() {
 log INFO "⏰ 启动预测任务"
 
 # ✅ 静默运行 Python，只由 loguru 写入 Jervis.log
-PYTHON_BIN=$(command -v python3 || echo "/usr/local/bin/python")
+PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12"
 PYTHONUNBUFFERED=1 "${PYTHON_BIN}" "$BASE_DIR/predictor/Jervis.py"
 
 STATUS=$?

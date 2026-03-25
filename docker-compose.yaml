@@ -7,7 +7,7 @@ services:
     image: javelin
     container_name: web
     ports:
-      - "5000:5000"
+      - "5024:5000"
     volumes:
       - ./logs:/Javelin/logs
     env_file:

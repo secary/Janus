@@ -27,7 +27,7 @@ log() {
 }
 
 log INFO "🧪 开始调参任务"
-PYTHON_BIN=$(command -v python3 || echo "/usr/local/bin/python")
+PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12"
 PYTHONUNBUFFERED=1 "${PYTHON_BIN}" "$BASE_DIR/predictor/tune_lstm.py"
 STATUS=$?
 

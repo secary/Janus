@@ -42,3 +42,6 @@ def get_currency_code(name_cn: str) -> str:
          
     finally:
         session.close()
+        
+        
+print(DB_CONFIG)
