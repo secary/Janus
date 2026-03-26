@@ -4,28 +4,78 @@
     <meta charset="UTF-8" />
     <title>Janus</title>
     <style>
+      :root {
+        --page-top-padding: max(18px, env(safe-area-inset-top, 0px) + 10px);
+        --page-side-padding: 1em;
+        --page-bottom-padding: 0.8em;
+        --header-height: 28px;
+      }
+
       body {
         font-family: "Segoe UI", sans-serif;
-        padding: 1.2em; /* 原 2em 缩小 */
-        max-width: 960px;
+        padding: var(--page-top-padding) var(--page-side-padding)
+          var(--page-bottom-padding);
+        max-width: 1400px;
         margin: auto;
         background-color: #f0f2f5;
         color: #333;
-        line-height: 1.5; /* 原 1.6 更紧凑 */
+        line-height: 1.4;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      .page-layout {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        min-height: calc(
+          100vh - var(--page-top-padding) - var(--page-bottom-padding) -
+            var(--header-height)
+        );
+        min-height: calc(
+          100dvh - var(--page-top-padding) - var(--page-bottom-padding) -
+            var(--header-height)
+        );
+      }
+
+      .main-content {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        padding-bottom: 0.5em;
+      }
+
+      .sidebar {
+        width: 380px;
+        flex: 0 0 380px;
+        position: sticky;
+        top: 0.8em;
+        align-self: flex-start;
       }
 
       h1,
       h2 {
         color: #2c3e50;
-        margin-top: 1em; /* 原 1.5em 缩小 */
-        margin-bottom: 0.5em; /* 添加底部间距控制 */
-        font-size: 1.4em; /* 原来较大，略微缩小 */
+        margin-top: 0.65em;
+        margin-bottom: 0.35em;
+        font-size: 1.25em;
+      }
+
+      h1 {
+        margin-top: 0;
+        margin-bottom: 0.2em;
+        font-size: 1.05em;
+        line-height: 1.2;
+        min-height: var(--header-height);
+        padding-left: 2px;
       }
 
       table {
         border-collapse: collapse;
         width: 100%;
-        margin-top: 0.8em; /* 原 1em */
+        margin-top: 0.4em;
         background: white;
         border-radius: 6px; /* 原 8px */
         overflow: hidden;
@@ -40,10 +90,10 @@
 
       th,
       td {
-        padding: 6px 8px; /* 原 8px 12px */
+        padding: 5px 8px;
         border: 1px solid #ccc;
         text-align: center;
-        font-size: 13.5px;
+        font-size: 13px;
       }
 
       tr:hover {
@@ -53,10 +103,10 @@
       select,
       button,
       input {
-        padding: 4px 8px; /* 原 6px 12px */
-        margin-top: 6px; /* 原 10px */
+        padding: 4px 8px;
+        margin-top: 4px;
         margin-right: 6px;
-        font-size: 0.95em;
+        font-size: 0.92em;
         border: 1px solid #ccc;
         border-radius: 4px;
       }
@@ -65,6 +115,73 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        max-height: 340px;
+      }
+
+      #logContainer {
+        white-space: pre-wrap;
+        font-family: monospace;
+        background: #f7f7f7;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 0.8em;
+        max-height: calc(100vh - 130px);
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        word-break: break-word;
+        padding-bottom: 0.45em;
+        margin-bottom: 0.45em;
+        border-bottom: 1px dashed #d6d6d6;
+        font-size: 12.5px;
+      }
+
+      .log-entry:last-child {
+        padding-bottom: 0;
+        margin-bottom: 0;
+        border-bottom: none;
+      }
+
+      #exchangeSummary {
+        margin: 0.25em 0;
+        font-size: 0.95em;
+      }
+
+      .meta-text {
+        margin: 0.2em 0;
+        font-size: 0.88em;
+        color: gray;
+      }
+
+      #currencySelect {
+        width: 180px;
+        min-width: 180px;
+      }
+
+      @media (max-width: 1100px) {
+        body {
+          overflow: auto;
+        }
+
+        .page-layout {
+          flex-direction: column;
+          min-height: auto;
+        }
+
+        .sidebar {
+          width: 100%;
+          flex: 1 1 auto;
+          position: static;
+        }
+
+        .main-content {
+          display: block;
+        }
+
+        #logContainer {
+          max-height: 400px;
+        }
       }
 
       @media (prefers-color-scheme: dark) {
@@ -102,129 +219,125 @@
           color: #ccc;
           border-color: #444;
         }
+        .log-entry {
+          border-bottom-color: #3a3a3a;
+        }
       }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <h1>🌐 Hi！私の名前はJanus!そうよ、あのJervisの僚艦の……</h1>
+    <div class="page-layout">
+      <main class="main-content">
+        <h2>📊 最新汇率</h2>
+        <table id="rateTable">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>货币</th>
+              <th>汇率</th>
+              <th>预测汇率</th>
+              <th>预测时间</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
 
-    <h2>📊 最新汇率</h2>
-    <table id="rateTable">
-      <thead>
-        <tr>
-          <th>日期</th>
-          <th>货币</th>
-          <th>汇率</th>
-          <th>预测汇率</th>
-          <th>预测时间</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+        <h2>💱 汇率换算</h2>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px; /* 原来较大，调小 */
+            padding: 0.65em;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            max-width: 750px;
+            flex-wrap: wrap;
+          "
+        >
+          <select
+            id="sourceCurrency"
+            style="
+              width: 200px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+            "
+          ></select>
 
-    <h2>💱 汇率换算</h2>
-    <div
-      style="
-        display: flex;
-        align-items: center;
-        gap: 6px; /* 原来较大，调小 */
-        padding: 0.8em; /* 缩小内边距 */
-        background: #fff;
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        max-width: 750px;
-        flex-wrap: wrap;
-      "
-    >
-      <select
-        id="sourceCurrency"
-        style="
-          width: 200px;
-          height: 42px;
-          font-size: 1.05em;
-          padding: 6px 10px;
-          border-radius: 6px;
-          border: 1px solid #ccc;
-        "
-      ></select>
+          <input
+            type="number"
+            id="sourceAmount"
+            value="1"
+            min="0"
+            step="0.01"
+            style="
+              width: 120px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+            "
+          />
 
-      <input
-        type="number"
-        id="sourceAmount"
-        value="1"
-        min="0"
-        step="0.01"
-        style="
-          width: 120px;
-          height: 42px;
-          font-size: 1.05em;
-          padding: 6px 10px;
-          border-radius: 6px;
-          border: 1px solid #ccc;
-        "
-      />
+          <span style="font-size: 1.4em">⇨</span>
 
-      <span style="font-size: 1.4em">⇨</span>
+          <span
+            style="
+              min-width: 90px;
+              height: 38px;
+              line-height: 38px;
+              font-size: 1em;
+            "
+            >🇨🇳 人民币</span
+          >
 
-      <span
-        style="
-          min-width: 90px;
-          height: 42px;
-          line-height: 42px;
-          font-size: 1.05em;
-        "
-        >🇨🇳 人民币</span
-      >
+          <input
+            type="text"
+            id="convertedCny"
+            disabled
+            style="
+              width: 120px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+              background-color: #f4f4f4;
+              color: #333;
+            "
+          />
+        </div>
 
-      <input
-        type="text"
-        id="convertedCny"
-        disabled
-        style="
-          width: 120px;
-          height: 42px;
-          font-size: 1.1em;
-          padding: 6px 10px;
-          border-radius: 6px;
-          border: 1px solid #ccc;
-          background-color: #f4f4f4;
-          color: #333;
-        "
-      />
+        <p id="exchangeSummary" style="font-weight: bold"></p>
+        <p class="meta-text">
+          更新时间：<span id="updatedTime">-</span>
+        </p>
+
+        <h2>📈 汇率走势图</h2>
+        <select id="currencySelect" onchange="updateChart()"></select>
+        <canvas
+          id="rateChart"
+          width="800"
+          height="280"
+          style="max-width: 100%; margin-top: 0.5em"
+        ></canvas>
+
+        <h2>🔎 查看历史数据</h2>
+        <a href="/history" target="_blank"><button>查看历史记录</button></a>
+      </main>
+
+      <aside class="sidebar">
+        <h2>📄 实时日志</h2>
+        <div id="logContainer"></div>
+      </aside>
     </div>
-
-    <p id="exchangeSummary" style="margin: 0.4em 0; font-weight: bold"></p>
-    <p style="font-size: 0.9em; color: gray">
-      更新时间：<span id="updatedTime">-</span>
-    </p>
-
-    <h2>📈 汇率走势图</h2>
-    <select id="currencySelect" onchange="updateChart()"></select>
-    <canvas
-      id="rateChart"
-      width="800"
-      height="300"
-      style="max-width: 100%; margin-top: 1em"
-    ></canvas>
-
-    <h2>🔎 查看历史数据</h2>
-    <a href="/history" target="_blank"><button>查看历史记录</button></a>
-
-    <h2>📄 实时日志</h2>
-    <div
-      id="logContainer"
-      style="
-        white-space: pre-wrap;
-        font-family: monospace;
-        background: #f7f7f7;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        padding: 1em;
-        max-height: 400px;
-        overflow-y: auto;
-      "
-    ></div>
 
     <script>
       const flagMap = {
@@ -261,6 +374,7 @@ function loadLogs() {
 
             data.forEach((row) => {
               const div = document.createElement("div");
+              div.className = "log-entry";
 
               const line = `[${row.timestamp}] [${row.level}] ${row.message}`;
               div.textContent = line;
