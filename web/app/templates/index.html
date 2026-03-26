@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh">
   <head>
     <meta charset="UTF-8" />
@@ -104,7 +104,7 @@
         }
       }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <h1>🌐 Hi！私の名前はJanus!そうよ、あのJervisの僚艦の……</h1>
@@ -247,7 +247,7 @@
         allData = {},
         latestRateMap = {};
 
-      function loadLogs() {
+function loadLogs() {
         fetch("/api/logs/latest")
           .then((res) => res.json())
           .then((data) => {
@@ -289,15 +289,14 @@
             const tbody = document.querySelector("#rateTable tbody");
             latestRateMap = {};
             tbody.innerHTML = "";
-          
             data.forEach((row) => {
               latestRateMap[row.Currency] = row.Rate;
               const tr = document.createElement("tr");
               tr.innerHTML = `
                 <td>${row.Date}</td>
                 <td>${flagMap[row.Currency] || ""} ${
-                  currencyNameMap[row.Currency] || row.Currency
-                }</td>
+                currencyNameMap[row.Currency] || row.Currency
+              }</td>
                 <td>${row.Rate}</td>
                 <td>${
                   row.PredictedRate !== null
@@ -331,7 +330,7 @@
             (cur) =>
               `<option value="${cur}">${flagMap[cur] || ""} ${
                 currencyNameMap[cur] || cur
-              }</option>`,
+              }</option>`
           )
           .join("");
 
@@ -347,11 +346,11 @@
           document.getElementById("convertedCny").value = cnyValue.toFixed(4);
           summary.innerHTML = `
             <div>1 ${currencyNameMap[cur] || cur} ≈ ${rate.toFixed(
-              4,
-            )} 人民币</div>
+            4
+          )} 人民币</div>
             <div>1 人民币 ≈ ${(1 / rate).toFixed(4)} ${
-              currencyNameMap[cur] || cur
-            }</div>`;
+            currencyNameMap[cur] || cur
+          }</div>`;
         }
 
         document
@@ -379,7 +378,7 @@
                 (k) =>
                   `<option value="${k}">${flagMap[k] || ""} ${
                     currencyNameMap[k] || k
-                  }</option>`,
+                  }</option>`
               )
               .join("");
             if (keys.length) {
@@ -399,39 +398,36 @@
         const currency = document.getElementById("currencySelect").value;
         const rowsRaw = (allData && allData[currency]) || [];
 
-        // ✅ 按时间排序（从旧到新）
-        const rowsSorted = rowsRaw
+        // 仅显示最近 2 天
+        const now = new Date();
+        const windowStart = new Date(now.getTime() - 2 * 86400000);
+
+        // 先排序（保证时间轴有序），再窗口筛选
+        const rows = rowsRaw
           .slice()
           .sort(
-            (a, b) =>
-              new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
-          );
-
-        // ✅ 只取最新 10 条（核心）
-        const rows = rowsSorted.slice(-10);
+            (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+          )
+          .filter((r) => new Date(r.datetime) >= windowStart);
 
         const labels = rows.map((d) => d.datetime);
 
+        // 历史线：rate 有值；预测线：predicted 有值
         const historyRates = rows.map((d) =>
-          d.rate !== null && d.rate !== undefined ? d.rate : null,
+          d.rate !== null && d.rate !== undefined ? d.rate : null
         );
-
         const predictionRates = rows.map((d) =>
-          d.predicted !== null && d.predicted !== undefined
-            ? d.predicted
-            : null,
+          d.predicted !== null && d.predicted !== undefined ? d.predicted : null
         );
 
-        // 🔗 连接线逻辑（保留你的）
+        // 连接线：只在“最后一个历史点”和“第一个预测点”处取值，其他为 null
         const lastHistIndex = (() => {
           for (let i = historyRates.length - 1; i >= 0; i--) {
             if (historyRates[i] !== null) return i;
           }
           return -1;
         })();
-
         const firstPredIndex = predictionRates.findIndex((v) => v !== null);
-
         const connectorData = new Array(rows.length).fill(null);
         if (lastHistIndex !== -1 && firstPredIndex !== -1) {
           connectorData[lastHistIndex] = historyRates[lastHistIndex];
@@ -439,9 +435,7 @@
         }
 
         const ctx = document.getElementById("rateChart").getContext("2d");
-
         if (chartInstance) chartInstance.destroy();
-
         chartInstance = new Chart(ctx, {
           type: "line",
           data: {
@@ -462,11 +456,14 @@
                 data: predictionRates,
                 borderColor: "rgba(255, 99, 132, 1)",
                 borderDash: [6, 6],
-                pointRadius: 4,
+                pointBackgroundColor: "rgba(255, 99, 132, 1)",
+                pointStyle: "circle",
+                pointRadius: 4, // 单点也明显
                 fill: false,
                 tension: 0,
                 spanGaps: true,
               },
+
             ],
           },
           options: {
@@ -476,15 +473,28 @@
               tooltip: {
                 callbacks: {
                   title: (ctx) => `时间：${ctx[0].label}`,
+                  label: (ctx) => {
+                    const val =
+                      ctx.parsed && typeof ctx.parsed.y === "number"
+                        ? ctx.parsed.y
+                        : null;
+                    return `${ctx.dataset.label}：${
+                      val === null ? "-" : String(val)
+                    }`;
+                  },
                 },
               },
               legend: {
-                labels: { usePointStyle: true },
+                labels: {
+                  usePointStyle: true,
+                  filter: (item) => item.text !== "连接线",
+                },
               },
             },
             scales: {
               x: {
                 title: { display: true, text: "时间" },
+                ticks: { autoSkip: true, maxTicksLimit: 10 },
               },
               y: {
                 title: { display: true, text: "汇率" },
