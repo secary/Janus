@@ -30,3 +30,4 @@ web/scripts
 *crontab.txt
 web/scripts
 *notifier.py
+.DS_Store

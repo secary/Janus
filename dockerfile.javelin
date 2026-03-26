@@ -4,15 +4,13 @@ FROM python:3.12-slim
 # 设置工作目录
 WORKDIR /Javelin
 
-RUN apt-get update
-
-COPY web/requirements.txt /Javelin/requirements.txt
-RUN pip install --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
-
+RUN apt-get update && apt-get install -y tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
+    
 # 拷贝网站代码和模板
 COPY web/ /Javelin/web/
-
+RUN pip install --no-cache-dir -r /Javelin/web/requirements.txt
 # 拷贝共享配置与模块
 COPY config/ /Javelin/config/
 COPY utils/ /Javelin/utils/
@@ -26,5 +24,3 @@ EXPOSE 5000
 
 # 启动 Flask
 CMD ["python", "/Javelin/web/Javelin.py"]
-
-
