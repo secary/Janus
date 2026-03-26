@@ -21,6 +21,8 @@ data
 *.csv
 *.pth
 *.sql
+notebook/
+
 
 # dev
 .vscode
