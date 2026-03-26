@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+WORKDIR /Jervis
+
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY predictor/requirements.txt /Jervis/predictor/requirements.txt
+RUN pip install --no-cache-dir -r /Jervis/predictor/requirements.txt
+
+COPY config/ /Jervis/config/
+COPY utils/ /Jervis/utils/
+COPY predictor/ /Jervis/predictor/
+COPY data/ /Jervis/data/
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "/Jervis/predictor/Jervis.py"]

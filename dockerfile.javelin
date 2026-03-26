@@ -4,13 +4,16 @@ FROM python:3.12-slim
 # 设置工作目录
 WORKDIR /Javelin
 
-RUN apt-get update && apt-get install -y tzdata \
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
-    
+
+COPY web/requirements.txt /Javelin/web/requirements.txt
+RUN pip install --no-cache-dir -r /Javelin/web/requirements.txt \
+    && rm -rf /var/lib/apt/lists/*
+
 # 拷贝网站代码和模板
 COPY web/ /Javelin/web/
-RUN pip install --no-cache-dir -r /Javelin/web/requirements.txt
 # 拷贝共享配置与模块
 COPY config/ /Javelin/config/
 COPY utils/ /Javelin/utils/

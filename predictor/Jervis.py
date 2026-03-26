@@ -58,31 +58,14 @@ def insert_predictions(df: pd.DataFrame):
 
 
 def lstm_predict(currency: str, days: int=7):
-    
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_latest_model(MODEL_DIR, currency, device)
-    
+
     currency = currency.upper()
     df = preprocess(fetch_history(currency, 30))
     data = scale(df[['Rate']])
 
     seq = 48
-    # X, y = build_sequences(data, seq)
-    # X_train, y_train, X_test, y_test = split(X, y, 0.8)
-
-
-    # preds = scale(model.predict(X_test).cpu().numpy(), inverse=True)
-    # trues = scale(y_test.cpu().numpy(), inverse=True)
-    # dates = df.index[seq + len(X_train):]
-
-    # df_predict = pd.DataFrame({
-    #     "Date": dates,
-    #     "Currency": currency,
-    #     "Rates": trues.flatten(),
-    #     "Predicted_Rates": preds.flatten(),
-    #     "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
-    # })
-    
     # Generate future predictions
     future_steps = days * seq
     last_seq = data[-seq:].copy()

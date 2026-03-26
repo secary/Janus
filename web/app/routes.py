@@ -209,7 +209,7 @@ def get_latest_rates():
             predicted = session.query(Prediction).filter(
                 and_(
                     Prediction.Currency == row.Currency,
-                    Prediction.Date >= row.Date
+                    Prediction.Date > row.Date
                 )
             ).order_by(Prediction.Date.asc()).first()
 

@@ -31,3 +31,4 @@ web/scripts
 web/scripts
 *notifier.py
 .DS_Store
+*run*.sh

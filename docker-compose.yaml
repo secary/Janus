@@ -1,6 +1,6 @@
 
 services:
-  web:
+  javelin:
     build:
       context: .
       dockerfile: ./dockerfile.javelin
@@ -10,4 +10,35 @@ services:
       - "5024:5000"
     env_file:
       - .env.prod
+    volumes:
+      - ./web/app/routes.py:/Javelin/web/app/routes.py
+      - ./web/app/templates:/Javelin/web/app/templates
     restart: always
+
+  janus:
+    build:
+      context: .
+      dockerfile: ./dockerfile.janus
+    image: janus
+    container_name: crawler
+    env_file:
+      - .env.prod
+    volumes:
+      - ./main:/Janus/main
+      - ./config:/Janus/config
+      - ./utils:/Janus/utils
+    restart: "no"
+
+  jervis:
+    build:
+      context: .
+      dockerfile: ./dockerfile.jervis
+    image: jervis
+    container_name: predictor
+    env_file:
+      - .env.prod
+    volumes:
+      - ./predictor:/Jervis/predictor
+      - ./config:/Jervis/config
+      - ./utils:/Jervis/utils
+    restart: "no"
