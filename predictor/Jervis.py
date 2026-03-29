@@ -23,6 +23,7 @@ import time
 
 from methods import fetch_history, load_latest_model, scale, preprocess
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from config.settings import get_engine, get_currency_code, CURRENCIES # 你已有这个
 from utils.models import Prediction # 你的 Prediction ORM
 
@@ -33,19 +34,23 @@ def insert_predictions(df: pd.DataFrame):
     session = Session()
 
     try:
-        # # 1️⃣ 清空 prediction 表
-        session.query(Prediction).delete()
-
-        # 2️⃣ 批量插入新数据
         records = [
-            Prediction(
-                Date=row["Date"],
-                Currency=row["Currency"],
-                Predicted_rate=row["Predicted_Rates"],
-                Locals=row["Locals"]
-            ) for _, row in df.iterrows()
+            {
+                "Date": row["Date"],
+                "Currency": row["Currency"],
+                "Predicted_rate": row["Predicted_Rates"],
+                "Locals": row["Locals"],
+            }
+            for _, row in df.iterrows()
         ]
-        session.bulk_save_objects(records)
+
+        # 保留历史预测；同一时间点重复生成时只更新该记录，避免主键冲突
+        stmt = mysql_insert(Prediction.__table__).values(records)
+        stmt = stmt.on_duplicate_key_update(
+            Predicted_rate=stmt.inserted.Predicted_rate,
+            Locals=stmt.inserted.Locals,
+        )
+        session.execute(stmt)
         session.commit()
         logger.info(f"✅ 成功写入 {len(records)} 条预测数据")
 
