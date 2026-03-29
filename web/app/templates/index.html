@@ -234,7 +234,7 @@
         <table id="rateTable">
           <thead>
             <tr>
-              <th>日期</th>
+              <th>更新时间</th>
               <th>货币</th>
               <th>汇率</th>
               <th>预测汇率</th>
@@ -360,8 +360,8 @@
         allData = {},
         latestRateMap = {};
 
-function loadLogs() {
-        fetch("/api/logs/latest")
+      function loadLogs() {
+        fetch("/api/logs/latest", { cache: "no-store" })
           .then((res) => res.json())
           .then((data) => {
             const container = document.getElementById("logContainer");
@@ -397,7 +397,7 @@ function loadLogs() {
 
       /* === 最新汇率表格 & 换算 === */
       function loadLatestRates() {
-        fetch("/api/latest")
+        fetch("/api/latest", { cache: "no-store" })
           .then((res) => res.json())
           .then((data) => {
             const tbody = document.querySelector("#rateTable tbody");
@@ -405,9 +405,11 @@ function loadLogs() {
             tbody.innerHTML = "";
             data.forEach((row) => {
               latestRateMap[row.Currency] = row.Rate;
+              const displayTime = row.Locals || row.Date;
+              const sourceDate = row.Date ? `<div style="font-size: 0.8em; color: #888; margin-top: 2px;">源站：${row.Date}</div>` : "";
               const tr = document.createElement("tr");
               tr.innerHTML = `
-                <td>${row.Date}</td>
+                <td>${displayTime}${sourceDate}</td>
                 <td>${flagMap[row.Currency] || ""} ${
                 currencyNameMap[row.Currency] || row.Currency
               }</td>
@@ -467,21 +469,17 @@ function loadLogs() {
           }</div>`;
         }
 
-        document
-          .getElementById("sourceCurrency")
-          .addEventListener("change", updateDisplay);
-        document
-          .getElementById("sourceAmount")
-          .addEventListener("input", updateDisplay);
+        document.getElementById("sourceCurrency").onchange = updateDisplay;
+        document.getElementById("sourceAmount").oninput = updateDisplay;
 
-        const firstDate = latestData.find((d) => d.Date);
-        if (firstDate) updateTime.textContent = firstDate.Date;
+        const firstDate = latestData.find((d) => d.Locals || d.Date);
+        if (firstDate) updateTime.textContent = firstDate.Locals || firstDate.Date;
         updateDisplay();
       }
 
       /* === 历史+预测图 === */
       function loadChartData() {
-        fetch("/api/history/chart")
+        fetch("/api/history/chart", { cache: "no-store" })
           .then((res) => res.json())
           .then((data) => {
             allData = data || {};
@@ -511,49 +509,66 @@ function loadLogs() {
       function updateChart() {
         const currency = document.getElementById("currencySelect").value;
         const rowsRaw = (allData && allData[currency]) || [];
+        const HALF_HOUR_MS = 30 * 60 * 1000;
+        const HOUR_MS = 60 * 60 * 1000;
+        const formatDateTime = (value) => {
+          const dt = new Date(value);
+          const month = String(dt.getMonth() + 1).padStart(2, "0");
+          const day = String(dt.getDate()).padStart(2, "0");
+          const hours = String(dt.getHours()).padStart(2, "0");
+          const minutes = String(dt.getMinutes()).padStart(2, "0");
+          return `${month}-${day} ${hours}:${minutes}`;
+        };
+        const floorToHalfHour = (value) =>
+          Math.floor(value / HALF_HOUR_MS) * HALF_HOUR_MS;
+        const ceilToHalfHour = (value) =>
+          Math.ceil(value / HALF_HOUR_MS) * HALF_HOUR_MS;
 
-        // 仅显示最近 2 天
-        const now = new Date();
-        const windowStart = new Date(now.getTime() - 2 * 86400000);
-
-        // 先排序（保证时间轴有序），再窗口筛选
         const rows = rowsRaw
           .slice()
           .sort(
             (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-          )
-          .filter((r) => new Date(r.datetime) >= windowStart);
+          );
 
-        const labels = rows.map((d) => d.datetime);
-
-        // 历史线：rate 有值；预测线：predicted 有值
-        const historyRates = rows.map((d) =>
-          d.rate !== null && d.rate !== undefined ? d.rate : null
-        );
-        const predictionRates = rows.map((d) =>
-          d.predicted !== null && d.predicted !== undefined ? d.predicted : null
-        );
-
-        // 连接线：只在“最后一个历史点”和“第一个预测点”处取值，其他为 null
-        const lastHistIndex = (() => {
-          for (let i = historyRates.length - 1; i >= 0; i--) {
-            if (historyRates[i] !== null) return i;
-          }
-          return -1;
-        })();
-        const firstPredIndex = predictionRates.findIndex((v) => v !== null);
-        const connectorData = new Array(rows.length).fill(null);
-        if (lastHistIndex !== -1 && firstPredIndex !== -1) {
-          connectorData[lastHistIndex] = historyRates[lastHistIndex];
-          connectorData[firstPredIndex] = predictionRates[firstPredIndex];
+        if (!rows.length) {
+          const ctx = document.getElementById("rateChart").getContext("2d");
+          if (chartInstance) chartInstance.destroy();
+          chartInstance = new Chart(ctx, {
+            type: "line",
+            data: { datasets: [] },
+            options: { responsive: true },
+          });
+          return;
         }
+
+        const historyRows = rows.filter(
+          (d) => d.rate !== null && d.rate !== undefined
+        );
+        const latestHistoryTime = historyRows.length
+          ? new Date(historyRows[historyRows.length - 1].datetime).getTime()
+          : new Date(rows[rows.length - 1].datetime).getTime();
+        const minTime = floorToHalfHour(new Date(rows[0].datetime).getTime());
+        const maxTime = ceilToHalfHour(latestHistoryTime + HOUR_MS);
+
+        // 历史线：只画最新 20 条爬虫数据
+        const historyRates = historyRows.map((d) => ({
+          x: new Date(d.datetime).getTime(),
+          y: d.rate,
+        }));
+
+        // 预测线：画历史窗口内的预测点，并保留最新爬虫点之后 1 小时内的预测值
+        const predictionRates = rows
+          .filter((d) => d.predicted !== null && d.predicted !== undefined)
+          .map((d) => ({
+            x: new Date(d.datetime).getTime(),
+            y: d.predicted,
+          }));
 
         const ctx = document.getElementById("rateChart").getContext("2d");
         if (chartInstance) chartInstance.destroy();
         chartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels,
             datasets: [
               {
                 label: `${currencyNameMap[currency] || currency} 历史汇率`,
@@ -582,11 +597,12 @@ function loadLogs() {
           },
           options: {
             responsive: true,
-            interaction: { mode: "index", intersect: false },
+            interaction: { mode: "nearest", intersect: false, axis: "x" },
             plugins: {
               tooltip: {
                 callbacks: {
-                  title: (ctx) => `时间：${ctx[0].label}`,
+                  title: (ctx) =>
+                    ctx.length ? `时间：${formatDateTime(ctx[0].parsed.x)}` : "",
                   label: (ctx) => {
                     const val =
                       ctx.parsed && typeof ctx.parsed.y === "number"
@@ -607,8 +623,20 @@ function loadLogs() {
             },
             scales: {
               x: {
+                type: "linear",
                 title: { display: true, text: "时间" },
-                ticks: { autoSkip: true, maxTicksLimit: 10 },
+                min: minTime,
+                max: maxTime,
+                grid: {
+                  offset: false,
+                },
+                ticks: {
+                  stepSize: HALF_HOUR_MS,
+                  minRotation: 0,
+                  maxRotation: 0,
+                  align: "center",
+                  callback: (value) => formatDateTime(value),
+                },
               },
               y: {
                 title: { display: true, text: "汇率" },
@@ -624,6 +652,8 @@ function loadLogs() {
         loadLatestRates();
         loadChartData();
         loadLogs(); // 加载日志
+        setInterval(loadLatestRates, 1000 * 60); // 每 1 分钟刷新最新汇率
+        setInterval(loadChartData, 1000 * 60); // 每 1 分钟刷新图表
         setInterval(loadLogs, 1000 * 60 * 10); // 每 10 分钟刷新
       };
     </script>

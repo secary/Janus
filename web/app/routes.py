@@ -197,10 +197,16 @@ def get_latest_rates():
             History.Date,
             History.Currency,
             History.Rate,
+            History.Locals,
             row_number
         ).subquery()
 
-        latest_history = session.query(subquery).filter(subquery.c.rnk == 1).all()
+        latest_history = (
+            session.query(subquery)
+            .filter(subquery.c.rnk == 1)
+            .order_by(subquery.c.Date.desc(), subquery.c.Currency.asc())
+            .all()
+        )
 
         response = []
 
@@ -215,6 +221,7 @@ def get_latest_rates():
 
             response.append({
                 "Date": row.Date.strftime("%Y-%m-%d %H:%M:%S"),
+                "Locals": row.Locals,
                 "Currency": row.Currency,
                 "Rate": row.Rate,
                 "PredictedRate": predicted.Predicted_rate if predicted else None,
@@ -229,23 +236,18 @@ def get_latest_rates():
 @main.route("/api/history/chart", methods=["GET"])
 def api_history_chart():
     log = get_log()
-    log.info("访问了 /api/history/chart 获取当日历史+预测数据")
+    log.info("访问了 /api/history/chart 获取最新 20 条实时汇率及最新爬虫点后 1 小时内预测图表数据")
     session = Session()
     try:
-        now = datetime.now()
-        today_start = datetime(now.year, now.month, now.day)  # 当天 00:00:00
-
-        # 历史（当天到此刻）
         history_rows = (
             session.query(History)
-            .filter(History.Date >= today_start, History.Date <= now)
+            .order_by(History.Date.desc())
             .all()
         )
 
-        # 预测（当天到此刻，不包含未来）
         prediction_rows = (
             session.query(Prediction)
-            .filter(Prediction.Date >= today_start, Prediction.Date <= now)
+            .order_by(Prediction.Date.desc())
             .all()
         )
 
@@ -262,9 +264,21 @@ def api_history_chart():
 
         response = {}
         for cur in set(list(history_map.keys()) + list(prediction_map.keys())):
-            all_times = sorted(set(history_map[cur].keys()) | set(prediction_map[cur].keys()))
+            latest_history_times = sorted(history_map[cur].keys())[-20:]
+            if not latest_history_times:
+                continue
+
+            chart_start_dt = latest_history_times[0]
+            latest_history_dt = latest_history_times[-1]
+            prediction_window_end = latest_history_dt + timedelta(hours=1)
+            visible_prediction_times = sorted(
+                dt
+                for dt in prediction_map[cur].keys()
+                if chart_start_dt <= dt <= prediction_window_end
+            )
+            chart_times = sorted(set(latest_history_times) | set(visible_prediction_times))
             merged = []
-            for dt in all_times:
+            for dt in chart_times:
                 merged.append({
                     "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
                     "rate": history_map[cur].get(dt),
