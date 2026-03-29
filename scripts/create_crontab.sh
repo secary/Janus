@@ -13,7 +13,7 @@ CRON_PREFIX="cd $BASE_DIR && $DOCKER_COMPOSE_BIN compose"
 
 # cron 任务
 CRON_JOB1="*/30 * * * * $CRON_PREFIX run --rm janus"
-CRON_JOB2="0 2 * * * $CRON_PREFIX run --rm jervis python /Jervis/predictor/Jervis.py"
+CRON_JOB2="0 2 * * 1 $CRON_PREFIX run --rm jervis python /Jervis/predictor/Jervis.py"
 CRON_JOB3="0 3 1 * * $CRON_PREFIX run --rm jervis python /Jervis/predictor/tune_lstm.py"
 
 # 去重 + 添加
