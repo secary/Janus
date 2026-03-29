@@ -4,8 +4,8 @@ services:
     build:
       context: .
       dockerfile: ./dockerfile.javelin
-    image: javelin
-    container_name: web
+    image: web
+    container_name: javelin 
     ports:
       - "5024:5000"
     env_file:
@@ -19,8 +19,8 @@ services:
     build:
       context: .
       dockerfile: ./dockerfile.janus
-    image: janus
-    container_name: crawler
+    image: crawler
+    container_name: janus
     env_file:
       - .env.prod
     volumes:
@@ -33,8 +33,8 @@ services:
     build:
       context: .
       dockerfile: ./dockerfile.jervis
-    image: jervis
-    container_name: predictor
+    image: predictor 
+    container_name: jervis
     env_file:
       - .env.prod
     volumes:
