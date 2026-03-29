@@ -12,3 +12,8 @@
 venv/
 .env
 .env.*
+
+# VCS and editor noise
+.git/
+.DS_Store
+**/.DS_Store
