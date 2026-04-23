@@ -1,1 +1,1 @@
-*/30 * * * * python /Janus/main/Janus.py >> /proc/1/fd/1 2>&1
+*/30 * * * * /usr/local/bin/python3 /Janus/main/Janus.py >> /proc/1/fd/1 2>&1

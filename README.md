@@ -1,18 +1,20 @@
-# 💱 Exchange Rate
+# 💱 Janus
+🌐 Hi！私の名前はJanus!
 
-本项目是一个端到端的人民币汇率数据平台，涵盖定时抓取、LSTM 预测、模型训练与 Web 可视化，全部通过 Docker 容器化运行。
+本项目是一个端到端的汇率数据平台，涵盖汇率抓取、数据库存储、LSTM 预测、模型训练与可视化展示，当前支持 Docker 化运行与宿主机 cron 调度。
 
 <!-- TOC -->
-- [💱 Exchange Rate](#-exchange-rate)
+- [💱 Janus](#-janus)
   - [📁 项目结构](#-项目结构)
-  - [⚙️ 架构概述](#️-架构概述)
+  - [⚙️ 功能概述](#️-功能概述)
   - [🚀 快速开始](#-快速开始)
-    - [1. 配置环境变量](#1-配置环境变量)
-    - [2. 初始化数据库](#2-初始化数据库)
-    - [3. 本地运行（不使用 Docker）](#3-本地运行不使用-docker)
+    - [1. 安装依赖](#1-安装依赖)
+    - [2. 配置环境变量](#2-配置环境变量)
+    - [3. 初始化数据库](#3-初始化数据库)
+    - [4. 本地运行](#4-本地运行)
   - [🐳 Docker 部署](#-docker-部署)
-  - [📈 Web 页面与 API](#-web-页面与-api)
-  - [🕒 定时任务](#-定时任务)
+  - [📈 Web 页面预览](#-web-页面预览)
+  - [🕒 定时任务支持](#-定时任务支持)
 <!-- TOC -->
 
 ---
@@ -23,70 +25,58 @@
 .
 ├── .env.example
 ├── .env.prod
-├── config/                  # 共享配置（数据库、货币列表）
-├── data/                    # CSV 历史数据
-├── docker-compose.yaml      # 容器编排（三服务）
+├── README.md
+├── config/                  # 共享配置
+├── data/                    # 数据文件
+├── docker-compose.yaml      # 容器编排
 ├── dockerfile.janus         # 爬虫镜像
 ├── dockerfile.javelin       # Web 镜像
 ├── dockerfile.jervis        # 预测镜像
 ├── main/
-│   ├── Janus.py             # 爬虫主程序
-│   ├── janus.cron           # 容器内 cron 规则
-│   ├── entrypoint.sh        # 容器启动入口
+│   ├── Janus.py
 │   └── requirements.txt
 ├── predictor/
-│   ├── Jervis.py            # 预测主程序
-│   ├── tune_lstm.py         # 模型训练脚本
-│   ├── methods.py           # 数据预处理与模型加载
-│   ├── models/
-│   │   ├── base.py
-│   │   ├── lstm.py          # RateLSTM 模型定义
-│   │   └── RateLSTM/        # 训练好的模型权重（.pth）
-│   ├── jervis.cron          # 容器内 cron 规则
-│   ├── entrypoint.sh        # 容器启动入口
+│   ├── Jervis.py
+│   ├── tune_lstm.py
 │   └── requirements.txt
 ├── scripts/
-│   └── create_crontab.sh    # 宿主机 cron 写入脚本（备用）
-├── utils/
-│   ├── models.py            # SQLAlchemy ORM 模型
-│   └── createdb.py          # 数据库初始化
+│   └── create_crontab.sh
+├── utils/                   # ORM / 数据库工具
 └── web/
-    ├── Javelin.py           # Flask 应用入口
+    ├── Javelin.py
     ├── requirements.txt
     └── app/
-        ├── routes.py        # API 路由
-        └── templates/
-            ├── index.html   # 主页（最新汇率 + 预测图）
-            └── history.html # 历史汇率页
 ```
 
 ---
 
-## ⚙️ 架构概述
+## ⚙️ 功能概述
 
-项目由三个独立服务组成，均以 Docker 容器运行：
-
-| 服务 | 容器名 | 职责 |
-|------|--------|------|
-| **Janus** | `janus` | 每 30 分钟从中国银行抓取人民币兑 AUD / JPY / USD 汇率，写入 MySQL |
-| **Jervis** | `jervis` | 每日凌晨使用 LSTM 模型预测未来 7 天汇率；每月重新训练模型 |
-| **Javelin** | `javelin` | Flask Web 服务，提供可视化页面与 REST API，对外暴露 5024 端口 |
-
-数据库使用 MySQL，由宿主机或外部容器提供（不在 compose 内管理）。
-
-**LSTM 模型：** `RateLSTM`，双层 LSTM（hidden_dim=64，dropout=0.2），以 48 步（对应 1 天 30 分钟粒度）为序列窗口，预测未来 7 天共 336 个时间步的汇率走势。
+| 模块 | 功能 |
+|------|------|
+| `Janus` | 抓取中国银行汇率并写入数据库 |
+| `Jervis` | 执行汇率预测，并复用同一镜像执行训练任务 |
+| `Javelin` | 提供基于 Flask 的可视化页面与 API |
+| `scripts/create_crontab.sh` | 自动写入宿主机 cron 调度 |
+| `docker-compose.yaml` | 编排 Web 服务与任务型容器 |
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 配置环境变量
+### 1. 安装依赖
 
-复制示例文件并填写数据库连接信息：
+按模块分别安装：
 
 ```bash
-cp .env.example .env
+pip install -r main/requirements.txt
+pip install -r predictor/requirements.txt
+pip install -r web/requirements.txt
 ```
+
+### 2. 配置环境变量
+
+参考 `.env.example` 或 `.env.prod`：
 
 ```env
 DB_USER=exchange_user
@@ -95,67 +85,87 @@ DB_HOST=127.0.0.1
 DB_NAME=exchange
 ```
 
-容器访问宿主机数据库时，将 `DB_HOST` 改为：
+如果容器访问宿主机数据库，`DB_HOST` 可使用：
 
 ```env
 DB_HOST=host.docker.internal
 ```
 
-### 2. 初始化数据库
+### 3. 初始化数据库
 
 ```bash
 python utils/createdb.py
 ```
 
-### 3. 本地运行（不使用 Docker）
-
-按模块分别安装依赖：
+### 4. 本地运行
 
 ```bash
-pip install -r main/requirements.txt
-pip install -r predictor/requirements.txt
-pip install -r web/requirements.txt
-```
-
-逐个启动：
-
-```bash
-python main/Janus.py          # 手动触发一次抓取
-python predictor/Jervis.py    # 手动触发一次预测
-python predictor/tune_lstm.py # 手动触发一次训练
-python web/Javelin.py         # 启动 Flask（localhost:5000）
+python main/Janus.py                  # 抓取汇率
+python predictor/Jervis.py            # 执行预测
+python predictor/tune_lstm.py         # 训练模型
+python web/Javelin.py                 # 启动 Flask 前端
 ```
 
 ---
 
 ## 🐳 Docker 部署
 
-构建所有镜像：
+构建镜像：
 
 ```bash
 docker compose build
 ```
 
-启动全部服务：
+启动 Web 常驻服务：
 
 ```bash
-docker compose up -d
+docker compose up -d javelin
 ```
 
-三个容器均配置为 `restart: always`，容器内置 cron 负责定时调度，无需宿主机干预。
-
-手动触发任务（不等待 cron）：
+手动执行任务型容器：
 
 ```bash
-docker compose exec janus python /Janus/main/Janus.py
-docker compose exec jervis python /Jervis/predictor/Jervis.py
-docker compose exec jervis python /Jervis/predictor/tune_lstm.py
+docker compose run --rm janus
+docker compose run --rm jervis python /Jervis/predictor/Jervis.py
+docker compose run --rm jervis python /Jervis/predictor/tune_lstm.py
 ```
 
-热更新（修改以下路径后只需重启 Web 容器，无需重新构建）：
+当前容器策略：
 
-- `web/app/routes.py`
-- `web/app/templates/`
+- `javelin` 为常驻 Web 服务
+- `janus` 为任务型容器
+- `jervis` 为任务型容器，同时承担预测与训练
+
+当前已启用的宿主机文件映射：
+
+- `javelin`
+  - `web/app/routes.py`
+  - `web/app/templates/`
+- `janus`
+  - `main/`
+  - `config/`
+  - `utils/`
+- `jervis`
+  - `predictor/`
+  - `config/`
+  - `utils/`
+
+因此修改这些目录下的代码后，通常无需重新 build 镜像。
+
+---
+
+## 📈 Web 页面预览
+
+- `index.html`：显示最新汇率、换算、预测图与实时日志
+- `history.html`：查看历史汇率数据
+
+默认访问地址：
+
+```text
+http://localhost:5024/
+```
+
+如果你修改了 `web/app/routes.py` 或 `web/app/templates/`，通常只需要重启 Web 容器：
 
 ```bash
 docker compose restart javelin
@@ -163,31 +173,28 @@ docker compose restart javelin
 
 ---
 
-## 📈 Web 页面与 API
+## 🕒 定时任务支持
 
-默认访问地址：`http://localhost:5024/`
+项目当前推荐使用宿主机 `cron` 调用 Docker 任务容器。
 
-| 路由 | 方法 | 说明 |
-|------|------|------|
-| `/` | GET | 主页：最新汇率卡片、汇率换算、历史 + 预测折线图、实时日志 |
-| `/history` | GET | 历史汇率数据浏览页 |
-| `/api/latest` | GET | 每种货币最新汇率及对应预测值 |
-| `/api/history` | GET | 历史汇率列表（支持 `?currency=USD` 筛选） |
-| `/api/history/chart` | GET | 最近 20 条历史点 + 未来预测点（用于图表渲染） |
-| `/api/logs/latest` | GET | 最新 50 条 Janus 爬虫日志 |
-| `/api/config` | GET | 查看各货币汇率告警阈值 |
-| `/api/config` | POST | 更新告警阈值（`{"Currency": "USD", "Upper": 7.5, "Lower": 7.0}`） |
+自动写入 cron：
 
----
+```bash
+zsh scripts/create_crontab.sh
+```
 
-## 🕒 定时任务
+当前调度规则为：
 
-定时调度由各容器内部的 cron 驱动，通过 `entrypoint.sh` 在容器启动时加载 `.cron` 文件：
+```cron
+*/30 * * * * cd /path/to/Janus && docker compose run --rm janus
+0 2 * * * cd /path/to/Janus && docker compose run --rm jervis python /Jervis/predictor/Jervis.py
+0 3 1 * * cd /path/to/Janus && docker compose run --rm jervis python /Jervis/predictor/tune_lstm.py
+```
 
-| 容器 | 规则 | 执行内容 |
-|------|------|---------|
-| `janus` | `*/30 * * * *` | 抓取中国银行汇率写入数据库 |
-| `jervis` | `0 2 * * *` | LSTM 预测未来 7 天汇率 |
-| `jervis` | `0 3 1 * *` | 重新训练 LSTM 模型 |
+分别对应：
+
+- 每 30 分钟抓取一次汇率
+- 每天 2 点执行一次预测
+- 每月 1 日 3 点执行一次训练
 
 ---
