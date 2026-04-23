@@ -124,3 +124,4 @@ def main():
 if __name__ == "__main__":
     logger.info(" Lucky Jervis. 今日もゼッタイよ！")
     main()
+    logger.complete()

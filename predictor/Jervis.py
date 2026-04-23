@@ -135,4 +135,5 @@ def main():
 if __name__ == "__main__":
     logger.info("Nice to meet you. Lucky Jervis、来たわ!")
     main()
+    logger.complete()
    

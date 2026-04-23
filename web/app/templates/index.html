@@ -321,7 +321,6 @@
         </p>
 
         <h2>📈 汇率走势图</h2>
-        <select id="currencySelect" onchange="updateChart()"></select>
         <canvas
           id="rateChart"
           width="800"
@@ -331,6 +330,7 @@
 
         <h2>🔎 查看历史数据</h2>
         <a href="/history" target="_blank"><button>查看历史记录</button></a>
+        <button type="button" onclick="refreshDashboard()">刷新数据</button>
       </main>
 
       <aside class="sidebar">
@@ -358,7 +358,10 @@
       };
       let chartInstance = null,
         allData = {},
-        latestRateMap = {};
+        latestRateMap = {},
+        lastCrawlerStamp = null,
+        crawlerRefreshTimer = null,
+        dashboardBootstrapped = false;
 
       function loadLogs() {
         fetch("/api/logs/latest", { cache: "no-store" })
@@ -397,7 +400,7 @@
 
       /* === 最新汇率表格 & 换算 === */
       function loadLatestRates() {
-        fetch("/api/latest", { cache: "no-store" })
+        return fetch("/api/latest", { cache: "no-store" })
           .then((res) => res.json())
           .then((data) => {
             const tbody = document.querySelector("#rateTable tbody");
@@ -423,12 +426,71 @@
               tbody.appendChild(tr);
             });
             setupCnyConverter(data);
+            return data;
           })
           .catch(() => {
             const tbody = document.querySelector("#rateTable tbody");
             tbody.innerHTML =
               '<tr><td colspan="5" style="color:#888">加载失败</td></tr>';
+            return [];
           });
+      }
+
+      function parseCrawlerTime(value) {
+        if (!value) return null;
+        const text = String(value).slice(0, 19).replace("T", " ");
+        const match = text.match(
+          /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
+        );
+        if (!match) return null;
+        const [, y, m, d, h, mi, s] = match;
+        return new Date(
+          Number(y),
+          Number(m) - 1,
+          Number(d),
+          Number(h),
+          Number(mi),
+          Number(s)
+        );
+      }
+
+      function getLatestCrawlerStamp(latestData) {
+        let latest = null;
+        (latestData || []).forEach((row) => {
+          const dt = parseCrawlerTime(row.Locals || row.Date);
+          if (dt && (!latest || dt.getTime() > latest.getTime())) {
+            latest = dt;
+          }
+        });
+        return latest ? latest.getTime() : null;
+      }
+
+      function scheduleCrawlerRefresh(latestStamp) {
+        if (crawlerRefreshTimer) clearTimeout(crawlerRefreshTimer);
+
+        const now = Date.now();
+        let delay = 30 * 1000;
+        if (latestStamp) {
+          const nextBoundary = latestStamp + 30 * 60 * 1000 + 5000;
+          delay = Math.max(nextBoundary - now, 15 * 1000);
+        }
+
+        crawlerRefreshTimer = setTimeout(refreshByCrawlerTime, delay);
+      }
+
+      function refreshByCrawlerTime() {
+        refreshDashboard();
+      }
+
+      function refreshDashboard() {
+        return loadLatestRates().then((data) => {
+          const stamp = getLatestCrawlerStamp(data);
+          lastCrawlerStamp = stamp;
+          return loadChartData().then(() => {
+            scheduleCrawlerRefresh(stamp);
+            return data;
+          });
+        });
       }
 
       function setupCnyConverter(latestData) {
@@ -469,7 +531,10 @@
           }</div>`;
         }
 
-        document.getElementById("sourceCurrency").onchange = updateDisplay;
+        document.getElementById("sourceCurrency").onchange = function () {
+          updateDisplay();
+          updateChart();
+        };
         document.getElementById("sourceAmount").oninput = updateDisplay;
 
         const firstDate = latestData.find((d) => d.Locals || d.Date);
@@ -479,38 +544,29 @@
 
       /* === 历史+预测图 === */
       function loadChartData() {
-        fetch("/api/history/chart", { cache: "no-store" })
+        return fetch("/api/history/chart", { cache: "no-store" })
           .then((res) => res.json())
           .then((data) => {
             allData = data || {};
-            const select = document.getElementById("currencySelect");
+            const select = document.getElementById("sourceCurrency");
             const keys = Object.keys(allData).sort();
-            select.innerHTML = keys
-              .map(
-                (k) =>
-                  `<option value="${k}">${flagMap[k] || ""} ${
-                    currencyNameMap[k] || k
-                  }</option>`
-              )
-              .join("");
-            if (keys.length) {
-              select.value = keys.includes("AUD") ? "AUD" : keys[0];
+            if (select && keys.length) {
+              const currentValue = select.value;
+              if (!keys.includes(currentValue)) {
+                select.value = keys.includes("AUD") ? "AUD" : keys[0];
+              }
             }
             updateChart();
           })
           .catch(() => {
             allData = {};
-            const select = document.getElementById("currencySelect");
-            select.innerHTML = `<option value="">加载失败</option>`;
             updateChart();
           });
       }
 
       function updateChart() {
-        const currency = document.getElementById("currencySelect").value;
+        const currency = document.getElementById("sourceCurrency").value;
         const rowsRaw = (allData && allData[currency]) || [];
-        const HALF_HOUR_MS = 30 * 60 * 1000;
-        const HOUR_MS = 60 * 60 * 1000;
         const formatDateTime = (value) => {
           const dt = new Date(value);
           const month = String(dt.getMonth() + 1).padStart(2, "0");
@@ -519,10 +575,6 @@
           const minutes = String(dt.getMinutes()).padStart(2, "0");
           return `${month}-${day} ${hours}:${minutes}`;
         };
-        const floorToHalfHour = (value) =>
-          Math.floor(value / HALF_HOUR_MS) * HALF_HOUR_MS;
-        const ceilToHalfHour = (value) =>
-          Math.ceil(value / HALF_HOUR_MS) * HALF_HOUR_MS;
 
         const rows = rowsRaw
           .slice()
@@ -544,35 +596,43 @@
         const historyRows = rows.filter(
           (d) => d.rate !== null && d.rate !== undefined
         );
-        const latestHistoryTime = historyRows.length
-          ? new Date(historyRows[historyRows.length - 1].datetime).getTime()
-          : new Date(rows[rows.length - 1].datetime).getTime();
-        const minTime = floorToHalfHour(new Date(rows[0].datetime).getTime());
-        const maxTime = ceilToHalfHour(latestHistoryTime + HOUR_MS);
+        const predictionRows = rows.filter(
+          (d) => d.predicted !== null && d.predicted !== undefined
+        );
+        const timelineRows = rows.slice(-20);
+        if (!timelineRows.length) {
+          const ctx = document.getElementById("rateChart").getContext("2d");
+          if (chartInstance) chartInstance.destroy();
+          chartInstance = new Chart(ctx, {
+            type: "line",
+            data: { datasets: [] },
+            options: { responsive: true },
+          });
+          return;
+        }
 
-        // 历史线：只画最新 20 条爬虫数据
-        const historyRates = historyRows.map((d) => ({
-          x: new Date(d.datetime).getTime(),
+        const labels = timelineRows.map((d) =>
+          formatDateTime(d.prediction_datetime || d.datetime)
+        );
+        const historyPoints = timelineRows.map((d) => ({
+          x: formatDateTime(d.datetime),
           y: d.rate,
         }));
-
-        // 预测线：画历史窗口内的预测点，并保留最新爬虫点之后 1 小时内的预测值
-        const predictionRates = rows
-          .filter((d) => d.predicted !== null && d.predicted !== undefined)
-          .map((d) => ({
-            x: new Date(d.datetime).getTime(),
-            y: d.predicted,
-          }));
+        const predictionPoints = timelineRows.map((d) => ({
+          x: formatDateTime(d.prediction_datetime || d.datetime),
+          y: d.predicted,
+        }));
 
         const ctx = document.getElementById("rateChart").getContext("2d");
         if (chartInstance) chartInstance.destroy();
         chartInstance = new Chart(ctx, {
           type: "line",
           data: {
+            labels,
             datasets: [
               {
                 label: `${currencyNameMap[currency] || currency} 历史汇率`,
-                data: historyRates,
+                data: historyPoints,
                 borderColor: "rgba(75, 192, 192, 1)",
                 backgroundColor: "rgba(75, 192, 192, 0.1)",
                 fill: true,
@@ -582,7 +642,7 @@
               },
               {
                 label: `${currencyNameMap[currency] || currency} 预测汇率`,
-                data: predictionRates,
+                data: predictionPoints,
                 borderColor: "rgba(255, 99, 132, 1)",
                 borderDash: [6, 6],
                 pointBackgroundColor: "rgba(255, 99, 132, 1)",
@@ -591,6 +651,7 @@
                 fill: false,
                 tension: 0,
                 spanGaps: true,
+                showLine: true,
               },
 
             ],
@@ -601,8 +662,7 @@
             plugins: {
               tooltip: {
                 callbacks: {
-                  title: (ctx) =>
-                    ctx.length ? `时间：${formatDateTime(ctx[0].parsed.x)}` : "",
+                  title: (ctx) => (ctx.length ? `执行时间：${ctx[0].label}` : ""),
                   label: (ctx) => {
                     const val =
                       ctx.parsed && typeof ctx.parsed.y === "number"
@@ -623,19 +683,16 @@
             },
             scales: {
               x: {
-                type: "linear",
-                title: { display: true, text: "时间" },
-                min: minTime,
-                max: maxTime,
+                type: "category",
                 grid: {
-                  offset: false,
+                  color: "rgba(0, 0, 0, 0.08)",
                 },
                 ticks: {
-                  stepSize: HALF_HOUR_MS,
+                  autoSkip: true,
+                  maxTicksLimit: 10,
                   minRotation: 0,
                   maxRotation: 0,
                   align: "center",
-                  callback: (value) => formatDateTime(value),
                 },
               },
               y: {
@@ -648,14 +705,15 @@
       }
 
       /* === 启动 === */
-      window.onload = function () {
-        loadLatestRates();
-        loadChartData();
-        loadLogs(); // 加载日志
-        setInterval(loadLatestRates, 1000 * 60); // 每 1 分钟刷新最新汇率
-        setInterval(loadChartData, 1000 * 60); // 每 1 分钟刷新图表
-        setInterval(loadLogs, 1000 * 60 * 10); // 每 10 分钟刷新
-      };
+      window.addEventListener("pageshow", function () {
+        refreshDashboard();
+        loadLogs();
+
+        if (!dashboardBootstrapped) {
+          dashboardBootstrapped = true;
+          setInterval(loadLogs, 1000 * 60 * 10); // 每 10 分钟刷新
+        }
+      });
     </script>
   </body>
 </html>

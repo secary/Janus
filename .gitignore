@@ -21,6 +21,7 @@ data
 *.csv
 *.pth
 *.sql
+*.txt
 notebook/
 
 

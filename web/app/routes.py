@@ -38,6 +38,23 @@ def get_log():
 
     return logger.bind(name="javelin", trace_id=trace_id)
 
+
+def floor_to_half_hour(dt: datetime) -> datetime:
+    """把时间归一到最近的半小时执行槽位。"""
+    minute = 0 if dt.minute < 30 else 30
+    return dt.replace(minute=minute, second=0, microsecond=0)
+
+
+def parse_local_time(value: str | None) -> datetime | None:
+    """解析 crawler 写入的 Locals 字段，忽略末尾时区名。"""
+    if not value:
+        return None
+
+    try:
+        return datetime.strptime(value[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
 @main.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -212,12 +229,14 @@ def get_latest_rates():
 
         # 2️⃣ 为每个历史记录找到相邻预测记录
         for row in latest_history:
+            anchor_dt = parse_local_time(row.Locals) or row.Date
+            prediction_dt = floor_to_half_hour(anchor_dt)
             predicted = session.query(Prediction).filter(
                 and_(
                     Prediction.Currency == row.Currency,
-                    Prediction.Date > row.Date
+                    Prediction.Date == prediction_dt
                 )
-            ).order_by(Prediction.Date.asc()).first()
+            ).first()
 
             response.append({
                 "Date": row.Date.strftime("%Y-%m-%d %H:%M:%S"),
@@ -225,7 +244,7 @@ def get_latest_rates():
                 "Currency": row.Currency,
                 "Rate": row.Rate,
                 "PredictedRate": predicted.Predicted_rate if predicted else None,
-                "PredictionDate": predicted.Date.strftime("%Y-%m-%d %H:%M:%S") if predicted else None
+                "PredictionDate": prediction_dt.strftime("%Y-%m-%d %H:%M:%S") if predicted else None
             })
 
         return jsonify(response)
@@ -236,7 +255,7 @@ def get_latest_rates():
 @main.route("/api/history/chart", methods=["GET"])
 def api_history_chart():
     log = get_log()
-    log.info("访问了 /api/history/chart 获取最新 20 条实时汇率及最新爬虫点后 1 小时内预测图表数据")
+    log.info("访问了 /api/history/chart 获取最新 20 条半小时爬虫点及其同刻预测点")
     session = Session()
     try:
         history_rows = (
@@ -254,35 +273,37 @@ def api_history_chart():
         from collections import defaultdict
         history_map = defaultdict(dict)
         for row in history_rows:
-            ts = row.Date.replace(second=0, microsecond=0)
-            history_map[row.Currency][ts] = row.Rate
+            anchor_dt = parse_local_time(row.Locals) or row.Date
+            ts = floor_to_half_hour(anchor_dt)
+            if ts not in history_map[row.Currency]:
+                history_map[row.Currency][ts] = row.Rate
 
         prediction_map = defaultdict(dict)
         for row in prediction_rows:
-            ts = row.Date.replace(second=0, microsecond=0)
-            prediction_map[row.Currency][ts] = row.Predicted_rate
+            ts = floor_to_half_hour(row.Date)
+            if ts not in prediction_map[row.Currency]:
+                prediction_map[row.Currency][ts] = row.Predicted_rate
 
         response = {}
         for cur in set(list(history_map.keys()) + list(prediction_map.keys())):
-            latest_history_times = sorted(history_map[cur].keys())[-20:]
+            history_times = sorted(history_map[cur].keys())
+            latest_history_times = history_times[-20:]
             if not latest_history_times:
                 continue
 
-            chart_start_dt = latest_history_times[0]
             latest_history_dt = latest_history_times[-1]
-            prediction_window_end = latest_history_dt + timedelta(hours=1)
-            visible_prediction_times = sorted(
-                dt
-                for dt in prediction_map[cur].keys()
-                if chart_start_dt <= dt <= prediction_window_end
-            )
-            chart_times = sorted(set(latest_history_times) | set(visible_prediction_times))
+            future_prediction_times = sorted(
+                dt for dt in prediction_map[cur].keys() if dt > latest_history_dt
+            )[:1]
+            chart_times = sorted(set(latest_history_times) | set(future_prediction_times))
             merged = []
             for dt in chart_times:
+                prediction_value = prediction_map[cur].get(dt)
                 merged.append({
                     "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
                     "rate": history_map[cur].get(dt),
-                    "predicted": prediction_map[cur].get(dt)
+                    "predicted": prediction_value,
+                    "prediction_datetime": dt.strftime("%Y-%m-%d %H:%M:%S") if prediction_value is not None else None,
                 })
             response[cur] = merged
 

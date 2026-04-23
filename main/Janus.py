@@ -190,3 +190,4 @@ def main():
 if __name__ == '__main__':
     logger.info("Janus、了解！任せなさい！")
     main()
+    logger.complete()
