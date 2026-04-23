@@ -23,6 +23,7 @@ data
 *.sql
 *.txt
 notebook/
+.claude
 
 
 # dev
