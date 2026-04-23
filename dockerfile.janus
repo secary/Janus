@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 WORKDIR /Janus
 
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata cron \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
@@ -22,10 +22,12 @@ RUN mkdir -p /var/tmp/pip-tmp \
 COPY config/ /Janus/config/
 COPY utils/ /Janus/utils/
 COPY main/ /Janus/main/
-COPY predictor/ /Janus/predictor/
 COPY data/ /Janus/data/
+
+RUN crontab /Janus/main/janus.cron \
+    && chmod +x /Janus/main/entrypoint.sh
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "/Janus/main/Janus.py"]
+CMD ["/Janus/main/entrypoint.sh"]
