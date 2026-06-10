@@ -1,40 +1,18 @@
 
 services:
-  javelin:
+  exchange-rate:
     build:
       context: .
-      dockerfile: ./dockerfile.javelin
-    image: web
-    container_name: javelin 
+      dockerfile: ./Dockerfile
+    image: exchange-rate
+    container_name: janus
     ports:
       - "5024:5000"
     env_file:
-      - .env.prod
+      - .env
     volumes:
-      - ./web/app/routes.py:/Javelin/web/app/routes.py
-      - ./web/app/templates:/Javelin/web/app/templates
-    restart: always
-
-  janus:
-    build:
-      context: .
-      dockerfile: ./dockerfile.janus
-    image: crawler
-    container_name: janus
-    env_file:
-      - .env.prod
-    volumes:
-      - ./data:/Janus/data
-    restart: always
-
-  jervis:
-    build:
-      context: .
-      dockerfile: ./dockerfile.jervis
-    image: predictor
-    container_name: jervis
-    env_file:
-      - .env.prod
-    volumes:
-      - ./predictor/models:/Jervis/predictor/models
+      - ./data:/app/data
+      - ./predictor/models:/app/predictor/models
+      - ./scripts:/app/scripts:ro
+    command: ["sh", "/app/scripts/docker-entrypoint.sh"]
     restart: always
