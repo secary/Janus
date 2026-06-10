@@ -1,2 +1,0 @@
-0 2 * * * /usr/local/bin/python3 /Jervis/predictor/Jervis.py >> /proc/1/fd/1 2>&1
-0 3 1 * * /usr/local/bin/python3 /Jervis/predictor/tune_lstm.py >> /proc/1/fd/1 2>&1

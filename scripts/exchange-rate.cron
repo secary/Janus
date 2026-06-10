@@ -1,0 +1,3 @@
+*/30 * * * * /app/.venv/bin/python /app/main/Janus.py >> /proc/1/fd/1 2>&1
+0 2 * * * /app/.venv/bin/python /app/predictor/Jervis.py >> /proc/1/fd/1 2>&1
+0 3 1 * * /app/.venv/bin/python /app/predictor/tune_lstm.py >> /proc/1/fd/1 2>&1

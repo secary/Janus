@@ -1,0 +1,26 @@
+[project]
+name = "exchange-rate"
+version = "0.1.0"
+description = "Exchange rate crawler, predictor, and web UI"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4==4.14.3",
+    "cryptography",
+    "flask==3.1.1",
+    "loguru==0.7.3",
+    "numpy==2.4.3",
+    "pandas==2.3.3",
+    "pymysql",
+    "python-dotenv==1.2.2",
+    "scikit-learn",
+    "sqlalchemy==2.0.35",
+    "torch",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
