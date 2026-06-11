@@ -6,6 +6,7 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(BASE_DIR)
 
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 from config.settings import get_engine
 from utils.models import Base, CurrencyMap
 import pandas as pd
@@ -67,6 +68,7 @@ def init_db():
 
     # ✅ 建表（只做一次）
     Base.metadata.create_all(engine)
+    ensure_history_indexes(engine)
 
     session = Session()
 
@@ -86,6 +88,27 @@ def init_db():
     session.close()
 
     print("✅ DB 初始化完成（表 + 币种映射）")
+
+
+def ensure_history_indexes(engine):
+    index_name = "idx_history_currency_date"
+    with engine.begin() as conn:
+        exists = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'history'
+                  AND INDEX_NAME = :index_name
+                LIMIT 1
+                """
+            ),
+            {"index_name": index_name},
+        ).first()
+
+        if not exists:
+            conn.execute(text(f"CREATE INDEX {index_name} ON history (Currency, Date)"))
 
 
 if __name__ == "__main__":

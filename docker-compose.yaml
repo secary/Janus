@@ -10,6 +10,10 @@ services:
       - "5024:5000"
     env_file:
       - .env
+    environment:
+      DB_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./predictor/models:/app/predictor/models
