@@ -77,6 +77,7 @@ uv sync --frozen
 DB_USER=exchange_user
 DB_PASSWORD=yourpassword
 DB_HOST=127.0.0.1
+DB_PORT=3306
 DB_NAME=exchange
 ```
 

@@ -1,11 +1,14 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean, Text, JSON, BigInteger
+from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean, Text, JSON, BigInteger, Index
 from datetime import datetime
 
 Base = declarative_base()
 
 class History(Base):
     __tablename__ = 'history'
+    __table_args__ = (
+        Index("idx_history_currency_date", "Currency", "Date"),
+    )
 
     Date = Column(DateTime, primary_key=True)
     Currency = Column(String(20), primary_key=True)

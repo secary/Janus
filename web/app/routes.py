@@ -205,23 +205,25 @@ def get_latest_rates():
     session = Session()
     try:
         # 1️⃣ 获取每种货币的最新一条历史记录
-        row_number = func.row_number().over(
-            partition_by=History.Currency,
-            order_by=History.Date.desc()
-        ).label("rnk")
-
-        subquery = session.query(
-            History.Date,
-            History.Currency,
-            History.Rate,
-            History.Locals,
-            row_number
-        ).subquery()
+        latest_dates = (
+            session.query(
+                History.Currency.label("Currency"),
+                func.max(History.Date).label("Date"),
+            )
+            .group_by(History.Currency)
+            .subquery()
+        )
 
         latest_history = (
-            session.query(subquery)
-            .filter(subquery.c.rnk == 1)
-            .order_by(subquery.c.Date.desc(), subquery.c.Currency.asc())
+            session.query(History)
+            .join(
+                latest_dates,
+                and_(
+                    History.Currency == latest_dates.c.Currency,
+                    History.Date == latest_dates.c.Date,
+                ),
+            )
+            .order_by(History.Date.desc(), History.Currency.asc())
             .all()
         )
 
