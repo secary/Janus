@@ -54,7 +54,7 @@ class Logs(Base):
 
     trace_id = Column(String(100))
     module = Column(String(100))
-    source = Column(String(50))       # janus / javelin / jervis
+    source = Column(String(50))       # janus / jervis
     log_type = Column(String(20))     # system / request / job
 
     message = Column(Text)

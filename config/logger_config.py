@@ -35,7 +35,6 @@ default_trace = contextvars.ContextVar("default_trace", default="-")
 trace_ids = {
     "janus": contextvars.ContextVar("janus_trace_id", default="-"),
     "jervis": contextvars.ContextVar("jervis_trace_id", default="-"),
-    "javelin": contextvars.ContextVar("javelin_trace_id", default="-"),
 }
 
 # ===============================
@@ -173,7 +172,6 @@ logger.add(safe_sink, level="INFO")
 # 文件
 # logger.add(file_sink_factory("janus"), level="DEBUG")
 # logger.add(file_sink_factory("jervis"), level="DEBUG")
-# logger.add(file_sink_factory("javelin"), level="DEBUG")
 
 # ⭐ 数据库（所有日志 + 异步）
 logger.add(db_sink, level="DEBUG", enqueue=True)
