@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>汇率历史记录</title>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            padding: 2em;
+            max-width: 960px;
+            margin: auto;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            font-size: 26px;
+            color: #2c3e50;
+            margin-bottom: 1em;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        select {
+            padding: 6px 10px;
+            font-size: 14px;
+            margin-bottom: 1em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+            font-size: 15px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <h1>📜 汇率历史记录</h1>
+
+    <label for="currencyFilter">筛选币种：</label>
+    <select id="currencyFilter" onchange="loadFilteredHistory()">
+        <option value="">全部</option>
+        <option value="JPY">日元</option>
+        <option value="AUD">澳大利亚元</option>
+        <option value="USD">美元</option>
+    </select>
+
+    <table id="historyTable">
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>货币</th>
+                <th>汇率</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function loadFilteredHistory() {
+            const currency = document.getElementById("currencyFilter").value;
+            let url = '/api/history';
+            if (currency) {
+                url += '?currency=' + encodeURIComponent(currency);
+            }
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.querySelector("#historyTable tbody");
+                    tbody.innerHTML = "";
+                    data.forEach(row => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `<td>${row.Date}</td><td>${row.Currency}</td><td>${row.Rate}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        // 初始加载
+        window.onload = loadFilteredHistory;
+    </script>
+</body>
+</html>

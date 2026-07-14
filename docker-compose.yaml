@@ -1,22 +1,37 @@
 
 services:
-  exchange-rate:
+  api:
     build:
-      context: .
+      context: ./backend
       dockerfile: ./Dockerfile
-    image: exchange-rate
-    container_name: janus
+    image: janus-api
+    container_name: janus-api
     ports:
-      - "5024:5000"
+      - "8080:8080"
     env_file:
       - .env
     environment:
-      DB_HOST: host.docker.internal
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-3306}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: janus-worker
+    container_name: janus-worker
+    env_file:
+      - .env
+    environment:
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-3306}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./predictor/models:/app/predictor/models
       - ./scripts:/app/scripts:ro
-    command: ["sh", "/app/scripts/docker-entrypoint.sh"]
     restart: always

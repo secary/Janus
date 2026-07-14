@@ -1,7 +1,7 @@
 # 💱 Janus
 🌐 Hi！私の名前はJanus!
 
-本项目是一个端到端的汇率数据平台，涵盖汇率抓取、数据库存储、LSTM 预测、模型训练与可视化展示，当前使用 uv 管理依赖，并通过单个 Docker 容器运行 Web 与定时任务。
+本项目是一个端到端的汇率数据平台，涵盖汇率抓取、数据库存储、LSTM 预测、模型训练与可视化展示，当前使用 uv 管理 Python 任务依赖，并通过 Docker Compose 拆分 Spring Boot API/前端、后台 worker 与可选 MySQL。
 
 <!-- TOC -->
 - [💱 Janus](#-janus)
@@ -24,11 +24,15 @@
 ```text
 .
 ├── .env.example
-├── Dockerfile
+├── Dockerfile                # Python worker 镜像
 ├── README.md
+├── backend/                  # Spring Boot API / 集成前端
+│   ├── Dockerfile
+│   └── src/
 ├── config/                  # 共享配置
 ├── data/                    # 数据文件
 ├── docker-compose.yaml      # 容器编排
+├── docker-compose.mysql.yaml # 可选 MySQL 编排
 ├── pyproject.toml           # uv 依赖配置
 ├── uv.lock                  # uv 锁文件
 ├── main/
@@ -38,6 +42,7 @@
 │   └── tune_lstm.py
 ├── scripts/
 │   ├── docker-entrypoint.sh
+│   ├── worker-entrypoint.sh
 │   └── exchange-rate.cron
 ├── utils/                   # ORM / 数据库工具
 └── web/
@@ -51,11 +56,12 @@
 
 | 模块 | 功能 |
 |------|------|
+| `backend` | 提供 Spring Boot API 与集成前端 |
 | `Janus` | 抓取中国银行汇率并写入数据库 |
-| `Jervis` | 执行汇率预测，并复用同一镜像执行训练任务 |
-| `Javelin` | 提供基于 Flask 的可视化页面与 API |
-| `scripts/exchange-rate.cron` | 容器内 cron 调度 |
-| `docker-compose.yaml` | 编排单个 Web + 任务容器 |
+| `Jervis` | 执行汇率预测，并复用 worker 镜像执行训练任务 |
+| `scripts/exchange-rate.cron` | worker 容器内 cron 调度 |
+| `docker-compose.yaml` | 默认编排 API/前端与后台 worker |
+| `docker-compose.mysql.yaml` | 按需追加 MySQL 容器 |
 
 ---
 
@@ -74,14 +80,14 @@ uv sync --frozen
 参考 `.env.example` 创建 `.env`：
 
 ```env
-DB_USER=exchange_user
-DB_PASSWORD=yourpassword
-DB_HOST=127.0.0.1
+DB_USER=root
+DB_PASSWORD=your_root_password
+DB_HOST=host.docker.internal
 DB_PORT=3306
 DB_NAME=exchange
 ```
 
-如果容器访问宿主机数据库，`DB_HOST` 可使用：
+默认 Docker Compose 会使用 `.env` 里的 `DB_HOST`、`DB_PORT` 连接外部数据库。如果容器访问宿主机数据库，`DB_HOST` 可使用：
 
 ```env
 DB_HOST=host.docker.internal
@@ -106,53 +112,75 @@ uv run python web/Javelin.py                 # 启动 Flask 前端
 
 ## 🐳 Docker 部署
 
-构建并启动单容器：
+默认只构建并启动 API/前端与 worker，数据库使用 `.env` 指向的外部 MySQL：
 
 ```bash
 docker compose up -d --build --remove-orphans
 ```
 
+如果需要同时启动容器内 MySQL，叠加 MySQL compose 文件：
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.mysql.yaml up -d --build --remove-orphans
+```
+
 查看日志：
 
 ```bash
-docker compose logs -f exchange-rate
+docker compose logs -f api
+docker compose logs -f worker
+```
+
+启用容器 MySQL 时再查看数据库日志：
+
+```bash
+docker compose logs -f mysql
 ```
 
 手动执行任务：
 
 ```bash
-docker compose exec exchange-rate python /app/main/Janus.py
-docker compose exec exchange-rate python /app/predictor/Jervis.py
-docker compose exec exchange-rate python /app/predictor/tune_lstm.py
+docker compose exec worker python /app/main/Janus.py
+docker compose exec worker python /app/predictor/Jervis.py
+docker compose exec worker python /app/predictor/tune_lstm.py
 ```
 
-当前容器策略：
+当前容器拆分：
 
-- `exchange-rate` 是唯一 Compose 服务，容器名保持为 `janus`
-- Flask 前端以前台进程运行
-- cron 在同一容器内定时执行抓取、预测和训练
+- `api`：运行 Spring Boot，集成 API 与前端，宿主机通过 `localhost:8080` 访问
+- `worker`：启动时初始化数据库表，然后运行 Python cron，定时执行抓取、预测和训练
+- `mysql`：可选服务，启用后提供独立 MySQL 数据库，宿主机通过 `localhost:3307` 访问
 
 当前已启用的宿主机文件映射：
 
 - `data/`：抓取数据文件
 - `predictor/models/`：训练后的模型文件
+- `mysql-data`：启用容器 MySQL 时使用的 MySQL 数据卷
 
-修改代码后需要重新构建镜像；数据和模型会通过 volume 保留。
+修改 Spring Boot 或 Python 代码后需要重新构建对应镜像；数据库、数据文件和模型会通过 volume 保留。
 
 ---
 
 ## 📈 Web 页面预览
 
+当前 Docker 默认启动 Spring Boot API/前端容器，可先验证健康检查：
+
+```text
+http://localhost:8080/api/health
+```
+
+旧 Flask 页面仍保留在 `web/app/templates/`，后续迁移到 Spring Boot 后再由 `api` 容器统一承载：
+
 - `index.html`：显示最新汇率、换算、预测图与实时日志
 - `history.html`：查看历史汇率数据
 
-默认访问地址：
+API/前端容器默认访问地址：
 
 ```text
-http://localhost:5024/
+http://localhost:8080/
 ```
 
-如果你修改了 Web 代码，重新构建并启动：
+如果你修改了 Spring Boot 或前端代码，重新构建并启动：
 
 ```bash
 docker compose up -d --build --remove-orphans

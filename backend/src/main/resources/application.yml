@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: janus-api
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:exchange}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${DB_USER:exchange_user}
+    password: ${DB_PASSWORD:yourpassword}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false

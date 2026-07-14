@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Janus</title>
+    <style>
+      :root {
+        --page-top-padding: max(18px, env(safe-area-inset-top, 0px) + 10px);
+        --page-side-padding: 1em;
+        --page-bottom-padding: 0.8em;
+        --header-height: 28px;
+      }
+
+      body {
+        font-family: "Segoe UI", sans-serif;
+        padding: var(--page-top-padding) var(--page-side-padding)
+          var(--page-bottom-padding);
+        max-width: 1400px;
+        margin: auto;
+        background-color: #f0f2f5;
+        color: #333;
+        line-height: 1.4;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      .page-layout {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        min-height: calc(
+          100vh - var(--page-top-padding) - var(--page-bottom-padding) -
+            var(--header-height)
+        );
+        min-height: calc(
+          100dvh - var(--page-top-padding) - var(--page-bottom-padding) -
+            var(--header-height)
+        );
+      }
+
+      .main-content {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        padding-bottom: 0.5em;
+      }
+
+      .sidebar {
+        width: 380px;
+        flex: 0 0 380px;
+        position: sticky;
+        top: 0.8em;
+        align-self: flex-start;
+      }
+
+      h1,
+      h2 {
+        color: #2c3e50;
+        margin-top: 0.65em;
+        margin-bottom: 0.35em;
+        font-size: 1.25em;
+      }
+
+      h1 {
+        margin-top: 0;
+        margin-bottom: 0.2em;
+        font-size: 1.05em;
+        line-height: 1.2;
+        min-height: var(--header-height);
+        padding-left: 2px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 0.4em;
+        background: white;
+        border-radius: 6px; /* 原 8px */
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* 更轻的阴影 */
+      }
+
+      th {
+        background-color: #f3f4f6;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        text-align: center;
+        font-size: 13px;
+      }
+
+      tr:hover {
+        background-color: #f9f9f9;
+      }
+
+      select,
+      button,
+      input {
+        padding: 4px 8px;
+        margin-top: 4px;
+        margin-right: 6px;
+        font-size: 0.92em;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      canvas {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        max-height: 340px;
+      }
+
+      #logContainer {
+        white-space: pre-wrap;
+        font-family: monospace;
+        background: #f7f7f7;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 0.8em;
+        max-height: calc(100vh - 130px);
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        word-break: break-word;
+        padding-bottom: 0.45em;
+        margin-bottom: 0.45em;
+        border-bottom: 1px dashed #d6d6d6;
+        font-size: 12.5px;
+      }
+
+      .log-entry:last-child {
+        padding-bottom: 0;
+        margin-bottom: 0;
+        border-bottom: none;
+      }
+
+      #exchangeSummary {
+        margin: 0.25em 0;
+        font-size: 0.95em;
+      }
+
+      .meta-text {
+        margin: 0.2em 0;
+        font-size: 0.88em;
+        color: gray;
+      }
+
+      #currencySelect {
+        width: 180px;
+        min-width: 180px;
+      }
+
+      @media (max-width: 1100px) {
+        body {
+          overflow: auto;
+        }
+
+        .page-layout {
+          flex-direction: column;
+          min-height: auto;
+        }
+
+        .sidebar {
+          width: 100%;
+          flex: 1 1 auto;
+          position: static;
+        }
+
+        .main-content {
+          display: block;
+        }
+
+        #logContainer {
+          max-height: 400px;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #121212;
+          color: #eee;
+        }
+        h1,
+        h2 {
+          color: #cfd8dc;
+        }
+        table,
+        canvas {
+          background: #1e1e1e;
+          color: #ccc;
+        }
+        th {
+          background-color: #2c2c2c;
+        }
+        tr:hover {
+          background-color: #2a2a2a;
+        }
+        input,
+        select {
+          background-color: #2a2a2a;
+          color: #fff;
+          border-color: #444;
+        }
+        input[disabled] {
+          background-color: #1e1e1e;
+          color: #ccc;
+        }
+        #logContainer {
+          background-color: #1e1e1e;
+          color: #ccc;
+          border-color: #444;
+        }
+        .log-entry {
+          border-bottom-color: #3a3a3a;
+        }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <h1>🌐 Hi！私の名前はJanus!そうよ、あのJervisの僚艦の……</h1>
+    <div class="page-layout">
+      <main class="main-content">
+        <h2>📊 最新汇率</h2>
+        <table id="rateTable">
+          <thead>
+            <tr>
+              <th>更新时间</th>
+              <th>货币</th>
+              <th>汇率</th>
+              <th>预测汇率</th>
+              <th>预测时间</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <h2>💱 汇率换算</h2>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px; /* 原来较大，调小 */
+            padding: 0.65em;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            max-width: 750px;
+            flex-wrap: wrap;
+          "
+        >
+          <select
+            id="sourceCurrency"
+            style="
+              width: 200px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+            "
+          ></select>
+
+          <input
+            type="number"
+            id="sourceAmount"
+            value="1"
+            min="0"
+            step="0.01"
+            style="
+              width: 120px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+            "
+          />
+
+          <span style="font-size: 1.4em">⇨</span>
+
+          <span
+            style="
+              min-width: 90px;
+              height: 38px;
+              line-height: 38px;
+              font-size: 1em;
+            "
+            >🇨🇳 人民币</span
+          >
+
+          <input
+            type="text"
+            id="convertedCny"
+            disabled
+            style="
+              width: 120px;
+              height: 38px;
+              font-size: 1em;
+              padding: 4px 8px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+              background-color: #f4f4f4;
+              color: #333;
+            "
+          />
+        </div>
+
+        <p id="exchangeSummary" style="font-weight: bold"></p>
+        <p class="meta-text">
+          更新时间：<span id="updatedTime">-</span>
+        </p>
+
+        <h2>📈 汇率走势图</h2>
+        <canvas
+          id="rateChart"
+          width="800"
+          height="280"
+          style="max-width: 100%; margin-top: 0.5em"
+        ></canvas>
+
+        <h2>🔎 查看历史数据</h2>
+        <a href="/history" target="_blank"><button>查看历史记录</button></a>
+        <button type="button" onclick="refreshDashboard()">刷新数据</button>
+      </main>
+
+      <aside class="sidebar">
+        <h2>📄 实时日志</h2>
+        <div id="logContainer"></div>
+      </aside>
+    </div>
+
+    <script>
+      const flagMap = {
+        AUD: "🇦🇺",
+        USD: "🇺🇸",
+        JPY: "🇯🇵",
+        EUR: "🇪🇺",
+        GBP: "🇬🇧",
+        CNY: "🇨🇳",
+      };
+      const currencyNameMap = {
+        AUD: "澳大利亚元",
+        USD: "美元",
+        JPY: "日元",
+        EUR: "欧元",
+        GBP: "英镑",
+        CNY: "人民币",
+      };
+      let chartInstance = null,
+        allData = {},
+        latestRateMap = {},
+        lastCrawlerStamp = null,
+        crawlerRefreshTimer = null,
+        dashboardBootstrapped = false;
+
+      function loadLogs() {
+        fetch("/api/logs/latest", { cache: "no-store" })
+          .then((res) => res.json())
+          .then((data) => {
+            const container = document.getElementById("logContainer");
+            container.innerHTML = "";
+
+            if (!data || data.length === 0) {
+              container.textContent = "⚠️ 暂无爬虫日志";
+              return;
+            }
+
+            data.forEach((row) => {
+              const div = document.createElement("div");
+              div.className = "log-entry";
+
+              const line = `[${row.timestamp}] [${row.level}] ${row.message}`;
+              div.textContent = line;
+
+              // 颜色（保留你的风格）
+              if (row.level === "ERROR") div.style.color = "red";
+              else if (row.level === "WARNING") div.style.color = "orange";
+              else if (row.level === "CRITICAL") div.style.color = "purple";
+
+              container.appendChild(div);
+            });
+
+            container.scrollTop = container.scrollHeight;
+          })
+          .catch(() => {
+            const container = document.getElementById("logContainer");
+            container.textContent = "⚠️ 日志加载失败。";
+          });
+      }
+
+      /* === 最新汇率表格 & 换算 === */
+      function loadLatestRates() {
+        return fetch("/api/latest", { cache: "no-store" })
+          .then((res) => res.json())
+          .then((data) => {
+            const tbody = document.querySelector("#rateTable tbody");
+            latestRateMap = {};
+            tbody.innerHTML = "";
+            data.forEach((row) => {
+              latestRateMap[row.Currency] = row.Rate;
+              const displayTime = row.Locals || row.Date;
+              const sourceDate = row.Date ? `<div style="font-size: 0.8em; color: #888; margin-top: 2px;">源站：${row.Date}</div>` : "";
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td>${displayTime}${sourceDate}</td>
+                <td>${flagMap[row.Currency] || ""} ${
+                currencyNameMap[row.Currency] || row.Currency
+              }</td>
+                <td>${row.Rate}</td>
+                <td>${
+                  row.PredictedRate !== null
+                    ? Number(row.PredictedRate).toFixed(4)
+                    : "N/A"
+                }</td>
+                <td>${row.PredictionDate || "—"}</td>`;
+              tbody.appendChild(tr);
+            });
+            setupCnyConverter(data);
+            return data;
+          })
+          .catch(() => {
+            const tbody = document.querySelector("#rateTable tbody");
+            tbody.innerHTML =
+              '<tr><td colspan="5" style="color:#888">加载失败</td></tr>';
+            return [];
+          });
+      }
+
+      function parseCrawlerTime(value) {
+        if (!value) return null;
+        const text = String(value).slice(0, 19).replace("T", " ");
+        const match = text.match(
+          /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
+        );
+        if (!match) return null;
+        const [, y, m, d, h, mi, s] = match;
+        return new Date(
+          Number(y),
+          Number(m) - 1,
+          Number(d),
+          Number(h),
+          Number(mi),
+          Number(s)
+        );
+      }
+
+      function getLatestCrawlerStamp(latestData) {
+        let latest = null;
+        (latestData || []).forEach((row) => {
+          const dt = parseCrawlerTime(row.Locals || row.Date);
+          if (dt && (!latest || dt.getTime() > latest.getTime())) {
+            latest = dt;
+          }
+        });
+        return latest ? latest.getTime() : null;
+      }
+
+      function scheduleCrawlerRefresh(latestStamp) {
+        if (crawlerRefreshTimer) clearTimeout(crawlerRefreshTimer);
+
+        const now = Date.now();
+        let delay = 30 * 1000;
+        if (latestStamp) {
+          const nextBoundary = latestStamp + 30 * 60 * 1000 + 5000;
+          delay = Math.max(nextBoundary - now, 15 * 1000);
+        }
+
+        crawlerRefreshTimer = setTimeout(refreshByCrawlerTime, delay);
+      }
+
+      function refreshByCrawlerTime() {
+        refreshDashboard();
+      }
+
+      function refreshDashboard() {
+        return loadLatestRates().then((data) => {
+          const stamp = getLatestCrawlerStamp(data);
+          lastCrawlerStamp = stamp;
+          return loadChartData().then(() => {
+            scheduleCrawlerRefresh(stamp);
+            return data;
+          });
+        });
+      }
+
+      function setupCnyConverter(latestData) {
+        const select = document.getElementById("sourceCurrency");
+        const summary = document.getElementById("exchangeSummary");
+        const updateTime = document.getElementById("updatedTime");
+
+        const rates = {};
+        latestData.forEach((row) => {
+          if (row.Currency !== "CNY") rates[row.Currency] = row.Rate;
+        });
+
+        select.innerHTML = Object.keys(rates)
+          .map(
+            (cur) =>
+              `<option value="${cur}">${flagMap[cur] || ""} ${
+                currencyNameMap[cur] || cur
+              }</option>`
+          )
+          .join("");
+
+        if (rates.AUD) select.value = "AUD";
+
+        function updateDisplay() {
+          const cur = select.value;
+          // 你的数据似乎是“100外币兑CNY”？保留 /100 的换算；如非此约定，可去掉 /100
+          const rate = rates[cur] / 100;
+          const amount =
+            parseFloat(document.getElementById("sourceAmount").value) || 0;
+          const cnyValue = amount * rate;
+          document.getElementById("convertedCny").value = cnyValue.toFixed(4);
+          summary.innerHTML = `
+            <div>1 ${currencyNameMap[cur] || cur} ≈ ${rate.toFixed(
+            4
+          )} 人民币</div>
+            <div>1 人民币 ≈ ${(1 / rate).toFixed(4)} ${
+            currencyNameMap[cur] || cur
+          }</div>`;
+        }
+
+        document.getElementById("sourceCurrency").onchange = function () {
+          updateDisplay();
+          updateChart();
+        };
+        document.getElementById("sourceAmount").oninput = updateDisplay;
+
+        const firstDate = latestData.find((d) => d.Locals || d.Date);
+        if (firstDate) updateTime.textContent = firstDate.Locals || firstDate.Date;
+        updateDisplay();
+      }
+
+      /* === 历史+预测图 === */
+      function loadChartData() {
+        return fetch("/api/history/chart", { cache: "no-store" })
+          .then((res) => res.json())
+          .then((data) => {
+            allData = data || {};
+            const select = document.getElementById("sourceCurrency");
+            const keys = Object.keys(allData).sort();
+            if (select && keys.length) {
+              const currentValue = select.value;
+              if (!keys.includes(currentValue)) {
+                select.value = keys.includes("AUD") ? "AUD" : keys[0];
+              }
+            }
+            updateChart();
+          })
+          .catch(() => {
+            allData = {};
+            updateChart();
+          });
+      }
+
+      function updateChart() {
+        const currency = document.getElementById("sourceCurrency").value;
+        const rowsRaw = (allData && allData[currency]) || [];
+        const formatDateTime = (value) => {
+          const dt = new Date(value);
+          const month = String(dt.getMonth() + 1).padStart(2, "0");
+          const day = String(dt.getDate()).padStart(2, "0");
+          const hours = String(dt.getHours()).padStart(2, "0");
+          const minutes = String(dt.getMinutes()).padStart(2, "0");
+          return `${month}-${day} ${hours}:${minutes}`;
+        };
+
+        const rows = rowsRaw
+          .slice()
+          .sort(
+            (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+          );
+
+        if (!rows.length) {
+          const ctx = document.getElementById("rateChart").getContext("2d");
+          if (chartInstance) chartInstance.destroy();
+          chartInstance = new Chart(ctx, {
+            type: "line",
+            data: { datasets: [] },
+            options: { responsive: true },
+          });
+          return;
+        }
+
+        const historyRows = rows.filter(
+          (d) => d.rate !== null && d.rate !== undefined
+        );
+        const predictionRows = rows.filter(
+          (d) => d.predicted !== null && d.predicted !== undefined
+        );
+        const timelineRows = rows.slice(-20);
+        if (!timelineRows.length) {
+          const ctx = document.getElementById("rateChart").getContext("2d");
+          if (chartInstance) chartInstance.destroy();
+          chartInstance = new Chart(ctx, {
+            type: "line",
+            data: { datasets: [] },
+            options: { responsive: true },
+          });
+          return;
+        }
+
+        const labels = timelineRows.map((d) =>
+          formatDateTime(d.prediction_datetime || d.datetime)
+        );
+        const historyPoints = timelineRows.map((d) => ({
+          x: formatDateTime(d.datetime),
+          y: d.rate,
+        }));
+        const predictionPoints = timelineRows.map((d) => ({
+          x: formatDateTime(d.prediction_datetime || d.datetime),
+          y: d.predicted,
+        }));
+
+        const ctx = document.getElementById("rateChart").getContext("2d");
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: `${currencyNameMap[currency] || currency} 历史汇率`,
+                data: historyPoints,
+                borderColor: "rgba(75, 192, 192, 1)",
+                backgroundColor: "rgba(75, 192, 192, 0.1)",
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0,
+                spanGaps: true,
+              },
+              {
+                label: `${currencyNameMap[currency] || currency} 预测汇率`,
+                data: predictionPoints,
+                borderColor: "rgba(255, 99, 132, 1)",
+                borderDash: [6, 6],
+                pointBackgroundColor: "rgba(255, 99, 132, 1)",
+                pointStyle: "circle",
+                pointRadius: 4, // 单点也明显
+                fill: false,
+                tension: 0,
+                spanGaps: true,
+                showLine: true,
+              },
+
+            ],
+          },
+          options: {
+            responsive: true,
+            interaction: { mode: "nearest", intersect: false, axis: "x" },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  title: (ctx) => (ctx.length ? `执行时间：${ctx[0].label}` : ""),
+                  label: (ctx) => {
+                    const val =
+                      ctx.parsed && typeof ctx.parsed.y === "number"
+                        ? ctx.parsed.y
+                        : null;
+                    return `${ctx.dataset.label}：${
+                      val === null ? "-" : String(val)
+                    }`;
+                  },
+                },
+              },
+              legend: {
+                labels: {
+                  usePointStyle: true,
+                  filter: (item) => item.text !== "连接线",
+                },
+              },
+            },
+            scales: {
+              x: {
+                type: "category",
+                grid: {
+                  color: "rgba(0, 0, 0, 0.08)",
+                },
+                ticks: {
+                  autoSkip: true,
+                  maxTicksLimit: 10,
+                  minRotation: 0,
+                  maxRotation: 0,
+                  align: "center",
+                },
+              },
+              y: {
+                title: { display: true, text: "汇率" },
+                grace: "5%",
+              },
+            },
+          },
+        });
+      }
+
+      /* === 启动 === */
+      window.addEventListener("pageshow", function () {
+        refreshDashboard();
+        loadLogs();
+
+        if (!dashboardBootstrapped) {
+          dashboardBootstrapped = true;
+          setInterval(loadLogs, 1000 * 60 * 10); // 每 10 分钟刷新
+        }
+      });
+    </script>
+  </body>
+</html>

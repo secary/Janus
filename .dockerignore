@@ -12,6 +12,10 @@
 venv/
 .env
 .env.*
+backend/
+web/
+data/
+predictor/models/
 
 # VCS and editor noise
 .git/
