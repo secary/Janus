@@ -5,8 +5,8 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "rootDir": "src/main/frontend-ts",
+    "rootDir": "src/main/frontend",
     "outDir": "src/main/resources/static/assets"
   },
-  "include": ["src/main/frontend-ts/**/*.ts"]
+  "include": ["src/main/frontend/**/*.ts"]
 }
