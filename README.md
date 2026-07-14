@@ -41,13 +41,9 @@
 │   ├── Jervis.py
 │   └── tune_lstm.py
 ├── scripts/
-│   ├── docker-entrypoint.sh
 │   ├── worker-entrypoint.sh
 │   └── exchange-rate.cron
-├── utils/                   # ORM / 数据库工具
-└── web/
-    ├── Javelin.py
-    └── app/
+└── utils/                   # ORM / 数据库工具
 ```
 
 ---
@@ -105,7 +101,6 @@ uv run python utils/createdb.py
 uv run python main/Janus.py                  # 抓取汇率
 uv run python predictor/Jervis.py            # 执行预测
 uv run python predictor/tune_lstm.py         # 训练模型
-uv run python web/Javelin.py                 # 启动 Flask 前端
 ```
 
 ---
@@ -169,7 +164,7 @@ docker compose exec worker python /app/predictor/tune_lstm.py
 http://localhost:8080/api/health
 ```
 
-旧 Flask 页面仍保留在 `web/app/templates/`，后续迁移到 Spring Boot 后再由 `api` 容器统一承载：
+前端页面由 Spring Boot `api` 容器统一承载：
 
 - `index.html`：显示最新汇率、换算、预测图与实时日志
 - `history.html`：查看历史汇率数据

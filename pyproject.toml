@@ -6,7 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4==4.14.3",
     "cryptography",
-    "flask==3.1.1",
     "loguru==0.7.3",
     "numpy==2.4.3",
     "pandas==2.3.3",
