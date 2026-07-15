@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "build:frontend": "tsc -p tsconfig.json"
+    "build:frontend": "tsc -p tsconfig.json",
+    "watch:frontend": "tsc -p tsconfig.json --watch --preserveWatchOutput"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
