@@ -12,12 +12,11 @@ import urllib.error
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from config.logger_config import trace_ids
 from config.settings import WEBSITE, CURRENCIES, get_engine, CSV_FILE
-from utils.models import CurrencyMap, History
 
 # 设置 trace_id（在初始化前设定）
 trace_id = os.getenv("TRACE_ID_JANUS") or f"JANUS-{uuid.uuid4()}"
@@ -26,11 +25,9 @@ trace_ids["janus"].set(trace_id)
 # 绑定 loguru logger（重要：为日志分类添加标识）
 logger = logger.bind(name="janus", trace_id=trace_id)
 
-Session = sessionmaker(bind=get_engine())
-session = Session()
-rows = session.query(CurrencyMap).all()
-CN2EN = { r.name_cn: r.code_en for r in rows }
-session.close()
+with get_engine().connect() as conn:
+    rows = conn.execute(text("SELECT name_cn, code_en FROM currency_map")).mappings().all()
+CN2EN = {row["name_cn"]: row["code_en"] for row in rows}
 
 def askurl(url, timeout=15, retries=3, delay=10):
     import socket
@@ -144,29 +141,27 @@ def store_data(data_dict):
     #     logger.error(f"❌ csv保存错误: {e}")
 
     engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
     try:
-        for row in all_data:
-            existing = session.query(History).filter_by(Date=row["Date"], Currency=row["Currency"]).first()
-            if existing:
-                existing.Locals = row["Locals"]
-            else:
-                new_entry = History(**row)
-                session.add(new_entry)
-        session.commit()
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO history (`Date`, Currency, Rate, Locals)
+                    VALUES (:Date, :Currency, :Rate, :Locals)
+                    ON DUPLICATE KEY UPDATE
+                        Locals = VALUES(Locals)
+                    """
+                ),
+                all_data,
+            )
         logger.info("✅ 数据成功更新到 exchange.history 数据库表")
     except OperationalError as e:
-        session.rollback()
         logger.error(f"❌ 数据库操作错误: {e.orig}")
         if "Can't connect to MySQL server" in str(e.orig):
             logger.warning("请检查 MySQL 服务器是否在正确的地址运行")
     except Exception as e:
-        session.rollback()
         logger.exception(f"❌ 其他错误: {e}")
-    finally:
-        session.close()
 
 def main():
     try:

@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
-from utils.models import CurrencyMap
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 load_dotenv(override=False)
 
@@ -48,15 +47,9 @@ def get_engine():
 
 def get_currency_code(name_cn: str) -> str:
     engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    try:
-        result = session.query(CurrencyMap).filter_by(name_cn=name_cn).first()
-        if result:
-            return result.code_en
-        else:
-            return None
-         
-    finally:
-        session.close()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT code_en FROM currency_map WHERE name_cn = :name_cn LIMIT 1"),
+            {"name_cn": name_cn},
+        ).scalar()
+    return result

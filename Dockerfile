@@ -35,7 +35,6 @@ COPY pyproject.toml uv.lock /app/
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY config/ /app/config/
-COPY utils/ /app/utils/
 COPY main/ /app/main/
 COPY predictor/ /app/predictor/
 RUN mkdir -p /app/data /app/predictor/models

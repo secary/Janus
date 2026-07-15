@@ -1,3 +1,6 @@
+-- Only creates Janus runtime configuration tables.
+-- For a full database bootstrap, use scripts/init_db_schema.sql.
+
 CREATE TABLE IF NOT EXISTS schedule_config (
     job_key VARCHAR(50) PRIMARY KEY,
     job_name VARCHAR(100) NOT NULL,
@@ -35,3 +38,16 @@ VALUES
         TRUE,
         '周期性训练 LSTM 模型'
     );
+
+CREATE TABLE IF NOT EXISTS app_config (
+    config_key VARCHAR(80) PRIMARY KEY,
+    config_value VARCHAR(255) NOT NULL,
+    description VARCHAR(255),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT IGNORE INTO app_config
+    (config_key, config_value, description)
+VALUES
+    ('prediction_method', 'lstm', '当前预测方法：lstm 或 last_observed'),
+    ('prediction_horizon_days', '7', '预测未来天数');

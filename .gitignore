@@ -20,7 +20,7 @@ logs
 data
 *.csv
 *.pth
-*.sql
+*.session.sql
 *.txt
 notebook/
 .claude

@@ -40,10 +40,11 @@
 ├── predictor/
 │   ├── Jervis.py
 │   └── tune_lstm.py
-├── scripts/
-│   ├── worker-entrypoint.sh
-│   └── exchange-rate.cron
-└── utils/                   # ORM / 数据库工具
+└── scripts/
+    ├── init_db.py
+    ├── init_db_schema.sql
+    ├── worker-entrypoint.sh
+    └── exchange-rate.cron
 ```
 
 ---
@@ -92,7 +93,7 @@ DB_HOST=host.docker.internal
 ### 3. 初始化数据库
 
 ```bash
-uv run python utils/createdb.py
+uv run python scripts/init_db.py
 ```
 
 ### 4. 本地运行
@@ -176,10 +177,26 @@ API/前端容器默认访问地址：
 http://localhost:8080/
 ```
 
-如果你修改了 Spring Boot 或前端代码，重新构建并启动：
+如果你修改了 Spring Boot 代码，重新构建并启动：
 
 ```bash
 docker compose up -d --build --remove-orphans
+```
+
+前端静态目录已挂载到 `api` 容器，修改
+`backend/src/main/resources/static/*` 后刷新浏览器即可生效，无需重构
+`api` 容器。修改 `backend/src/main/frontend/*.ts` 后需要先编译：
+
+```bash
+cd backend
+npm run build:frontend
+```
+
+需要持续监听 TypeScript 变更时：
+
+```bash
+cd backend
+npm run watch:frontend
 ```
 
 ---
@@ -188,7 +205,7 @@ docker compose up -d --build --remove-orphans
 
 项目使用容器内 `cron`。当前调度配置写入数据库 `schedule_config` 表，worker 启动时会读取该表生成 crontab，并通过 `scripts/sync_crontab.py` 每分钟刷新一次。
 
-如果应用数据库用户没有建表权限，需要先用数据库管理员账号执行 `scripts/schedule_config_schema.mysql`，创建 `schedule_config` 表并写入默认任务。
+如果应用数据库用户没有建表权限，需要先用数据库管理员账号执行 `scripts/init_db_schema.sql`，创建 Janus 所需表并写入默认配置。
 
 默认调度规则为：
 

@@ -16,10 +16,9 @@ trace_ids["jervis"].set(trace_id)
 
 import pandas as pd
 import numpy as np
-from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
+from sqlalchemy import text
 from config.settings import get_engine
-from utils.models import History
 
 from sklearn.preprocessing import MinMaxScaler
 import torch
@@ -29,39 +28,26 @@ scaler = MinMaxScaler()
 
 def fetch_history(currency: str | None=None, days: int | None=None) -> pd.DataFrame:
     """
-    返回最近 30 天的 History 记录，结果为 Pandas DataFrame。
+    返回 History 记录，结果为 Pandas DataFrame。
     """
-    Session = sessionmaker(bind=get_engine())
-    session = Session()
-    currency = currency.upper()
-    
-    try:
-        query = session.query(History)
-        
-        if days:
-            start_time = datetime.now() - timedelta(days=days)
-            query = session.query(History).filter(History.Date >= start_time)
+    start_time = datetime.now() - timedelta(days=days) if days else None
+    currency = currency.upper() if currency else None
 
-        if currency:
-            query = query.filter(History.Currency == currency)
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT `Date`, Currency, Rate, Locals
+                FROM history
+                WHERE (:start_time IS NULL OR `Date` >= :start_time)
+                  AND (:currency IS NULL OR Currency = :currency)
+                ORDER BY `Date` ASC
+                """
+            ),
+            {"start_time": start_time, "currency": currency},
+        ).mappings().all()
 
-        # 得到 ORM 对象列表
-        rows = query.order_by(History.Date.asc()).all()
-
-        # 转成字典列表
-        data = [
-            {
-                "Date": r.Date,
-                "Currency": r.Currency,
-                "Rate": r.Rate,
-                "Locals": r.Locals,
-            }
-            for r in rows
-        ]
-
-        return pd.DataFrame(data)
-    finally:
-        session.close()
+    return pd.DataFrame([dict(row) for row in rows])
         
 
 def batchify(X, y, batch_size):

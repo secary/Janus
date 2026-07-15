@@ -22,10 +22,8 @@ import torch
 import time
 
 from methods import fetch_history, load_latest_model, scale, preprocess
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy import text
 from config.settings import get_engine, get_currency_code, CURRENCIES # 你已有这个
-from utils.models import AppConfig, Prediction # 你的 Prediction ORM
 
 
 DEFAULT_PREDICTION_METHOD = "lstm"
@@ -34,8 +32,6 @@ DEFAULT_PREDICTION_HORIZON_DAYS = 7
 
 def insert_predictions(df: pd.DataFrame):
     engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
     try:
         records = [
@@ -48,34 +44,44 @@ def insert_predictions(df: pd.DataFrame):
             for _, row in df.iterrows()
         ]
 
-        # 保留历史预测；同一时间点重复生成时只更新该记录，避免主键冲突
-        stmt = mysql_insert(Prediction.__table__).values(records)
-        stmt = stmt.on_duplicate_key_update(
-            Predicted_rate=stmt.inserted.Predicted_rate,
-            Locals=stmt.inserted.Locals,
-        )
-        session.execute(stmt)
-        session.commit()
+        if not records:
+            logger.warning("⚠️ 没有预测记录需要写入")
+            return
+
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO prediction (`Date`, Currency, Predicted_rate, Locals)
+                    VALUES (:Date, :Currency, :Predicted_rate, :Locals)
+                    ON DUPLICATE KEY UPDATE
+                        Predicted_rate = VALUES(Predicted_rate),
+                        Locals = VALUES(Locals)
+                    """
+                ),
+                records,
+            )
         logger.info(f"✅ 成功写入 {len(records)} 条预测数据")
 
     except Exception as e:
-        session.rollback()
         logger.error(f"❌ 导入 prediction 表失败: {e}")
-
-    finally:
-        session.close()
 
 
 def load_prediction_config() -> tuple[str, int]:
     engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
     try:
-        rows = session.query(AppConfig).filter(
-            AppConfig.config_key.in_(["prediction_method", "prediction_horizon_days"])
-        ).all()
-        values = {row.config_key: row.config_value for row in rows}
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT config_key, config_value
+                    FROM app_config
+                    WHERE config_key IN ('prediction_method', 'prediction_horizon_days')
+                    """
+                )
+            ).mappings().all()
+        values = {row["config_key"]: row["config_value"] for row in rows}
         method = values.get("prediction_method", DEFAULT_PREDICTION_METHOD)
         if method not in {"lstm", "last_observed"}:
             logger.warning(f"⚠️ 不支持的预测方法 {method}，回退到 {DEFAULT_PREDICTION_METHOD}")
@@ -91,8 +97,6 @@ def load_prediction_config() -> tuple[str, int]:
     except Exception as exc:
         logger.warning(f"⚠️ 读取预测配置失败，使用默认配置: {exc}")
         return DEFAULT_PREDICTION_METHOD, DEFAULT_PREDICTION_HORIZON_DAYS
-    finally:
-        session.close()
 
 
 def lstm_predict(currency: str, days: int=7):
