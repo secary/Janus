@@ -168,6 +168,7 @@ http://localhost:8080/api/health
 
 - `index.html`：显示最新汇率、换算、预测图与实时日志
 - `history.html`：查看历史汇率数据
+- `admin.html`：管理定时任务频率与启用状态
 
 API/前端容器默认访问地址：
 
@@ -185,9 +186,11 @@ docker compose up -d --build --remove-orphans
 
 ## 🕒 定时任务支持
 
-项目使用容器内 `cron`，规则位于 `scripts/exchange-rate.cron`。
+项目使用容器内 `cron`。当前调度配置写入数据库 `schedule_config` 表，worker 启动时会读取该表生成 crontab，并通过 `scripts/sync_crontab.py` 每分钟刷新一次。
 
-当前调度规则为：
+如果应用数据库用户没有建表权限，需要先用数据库管理员账号执行 `scripts/schedule_config_schema.mysql`，创建 `schedule_config` 表并写入默认任务。
+
+默认调度规则为：
 
 ```cron
 */30 * * * * /app/.venv/bin/python /app/main/Janus.py
@@ -200,5 +203,13 @@ docker compose up -d --build --remove-orphans
 - 每 30 分钟抓取一次汇率
 - 每天 2 点执行一次预测
 - 每月 1 日 3 点执行一次训练
+
+管理页面：
+
+```text
+http://localhost:8080/admin
+```
+
+保存配置后，worker 会在下一次同步时把 `schedule_config` 写入容器内 crontab。
 
 ---
