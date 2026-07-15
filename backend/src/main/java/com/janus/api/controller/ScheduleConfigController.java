@@ -56,14 +56,14 @@ public class ScheduleConfigController {
 
     @GetMapping("/api/admin/schedules")
     public List<Map<String, Object>> schedules() {
-        ensureScheduleConfig();
+        ensureScheduleConfigRows();
         return loadSchedules();
     }
 
     @PostMapping("/api/admin/schedules")
     @Transactional
     public List<Map<String, Object>> updateSchedules(@RequestBody List<ScheduleUpdateRequest> requests) {
-        ensureScheduleConfig();
+        ensureScheduleConfigRows();
         if (requests == null || requests.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求中缺少调度配置");
         }
@@ -95,20 +95,13 @@ public class ScheduleConfigController {
         return loadSchedules();
     }
 
-    private void ensureScheduleConfig() {
-        jdbcTemplate.execute(
-                """
-                CREATE TABLE IF NOT EXISTS schedule_config (
-                    job_key VARCHAR(50) PRIMARY KEY,
-                    job_name VARCHAR(100) NOT NULL,
-                    cron_expression VARCHAR(100) NOT NULL,
-                    `command` VARCHAR(255) NOT NULL,
-                    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                    description VARCHAR(255),
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                )
-                """
-        );
+    private void ensureScheduleConfigRows() {
+        if (!scheduleConfigTableExists()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "缺少 schedule_config 表，请先使用数据库管理员账号执行 scripts/schedule_config_schema.mysql"
+            );
+        }
 
         for (DefaultSchedule schedule : DEFAULT_SCHEDULES) {
             jdbcTemplate.update(
@@ -125,6 +118,19 @@ public class ScheduleConfigController {
                     schedule.description()
             );
         }
+    }
+
+    private boolean scheduleConfigTableExists() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'schedule_config'
+                """,
+                Integer.class
+        );
+        return count != null && count > 0;
     }
 
     private List<Map<String, Object>> loadSchedules() {

@@ -10,7 +10,7 @@ import type {
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+    throw new Error(await responseErrorMessage(response));
   }
   return response.json() as Promise<T>;
 }
@@ -22,9 +22,19 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+    throw new Error(await responseErrorMessage(response));
   }
   return response.json() as Promise<T>;
+}
+
+async function responseErrorMessage(response: Response): Promise<string> {
+  const fallback = `Request failed: ${response.status} ${response.statusText}`;
+  try {
+    const payload = (await response.json()) as { message?: string; error?: string };
+    return payload.message || payload.error || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function fetchLatestRates(): Promise<LatestRate[]> {

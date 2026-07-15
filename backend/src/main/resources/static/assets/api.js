@@ -1,7 +1,7 @@
 async function fetchJson(url) {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
-        throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+        throw new Error(await responseErrorMessage(response));
     }
     return response.json();
 }
@@ -12,9 +12,19 @@ async function postJson(url, body) {
         body: JSON.stringify(body),
     });
     if (!response.ok) {
-        throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+        throw new Error(await responseErrorMessage(response));
     }
     return response.json();
+}
+async function responseErrorMessage(response) {
+    const fallback = `Request failed: ${response.status} ${response.statusText}`;
+    try {
+        const payload = await response.json();
+        return payload.message || payload.error || fallback;
+    }
+    catch {
+        return fallback;
+    }
 }
 export function fetchLatestRates() {
     return fetchJson("/api/latest");

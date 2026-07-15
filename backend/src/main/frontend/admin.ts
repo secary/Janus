@@ -183,9 +183,10 @@ async function loadSchedules(): Promise<void> {
     schedules = await fetchScheduleConfigs();
     renderScheduleRows(schedules);
     setStatus(`已加载 ${schedules.length} 个任务`, "success");
-  } catch {
+  } catch (error) {
     renderScheduleRows([]);
-    setStatus("调度配置加载失败", "error");
+    const message = error instanceof Error ? error.message : "调度配置加载失败";
+    setStatus(`调度配置加载失败：${message}`, "error");
   } finally {
     setLoading(false);
   }
@@ -206,8 +207,9 @@ async function saveSchedules(): Promise<void> {
     schedules = await saveScheduleConfigs(updates);
     renderScheduleRows(schedules);
     setStatus("配置已保存", "success");
-  } catch {
-    setStatus("配置保存失败", "error");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "配置保存失败";
+    setStatus(`配置保存失败：${message}`, "error");
   } finally {
     setLoading(false);
   }
