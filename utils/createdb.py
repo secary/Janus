@@ -8,9 +8,37 @@ sys.path.append(BASE_DIR)
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 from config.settings import get_engine
-from utils.models import Base, CurrencyMap
+from utils.models import Base, CurrencyMap, ScheduleConfig
 import pandas as pd
 from utils.models import History  # ⚠️ 确认路径和你项目一致
+
+
+DEFAULT_SCHEDULES = [
+    {
+        "job_key": "exchange_crawler",
+        "job_name": "汇率抓取",
+        "cron_expression": "*/30 * * * *",
+        "command": "/app/.venv/bin/python /app/main/Janus.py",
+        "enabled": True,
+        "description": "抓取中国银行汇率并写入 history 表",
+    },
+    {
+        "job_key": "exchange_prediction",
+        "job_name": "汇率预测",
+        "cron_expression": "0 2 * * *",
+        "command": "/app/.venv/bin/python /app/predictor/Jervis.py",
+        "enabled": True,
+        "description": "生成未来汇率预测并写入 prediction 表",
+    },
+    {
+        "job_key": "model_training",
+        "job_name": "模型训练",
+        "cron_expression": "0 3 1 * *",
+        "command": "/app/.venv/bin/python /app/predictor/tune_lstm.py",
+        "enabled": True,
+        "description": "周期性训练 LSTM 模型",
+    },
+]
 
 
 def import_csv_to_db(csv_path):
@@ -83,6 +111,11 @@ def init_db():
         exists = session.query(CurrencyMap).filter_by(code_en=code).first()
         if not exists:
             session.add(CurrencyMap(code_en=code, name_cn=name))
+
+    for item in DEFAULT_SCHEDULES:
+        exists = session.query(ScheduleConfig).filter_by(job_key=item["job_key"]).first()
+        if not exists:
+            session.add(ScheduleConfig(**item))
 
     session.commit()
     session.close()

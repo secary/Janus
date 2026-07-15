@@ -28,6 +28,18 @@ class AutomationSwitch(Base):
     
     key = Column(String(50), primary_key=True)  # 例如：'auto_enabled'
     value = Column(Boolean, nullable=False)  
+
+
+class ScheduleConfig(Base):
+    __tablename__ = "schedule_config"
+
+    job_key = Column(String(50), primary_key=True)
+    job_name = Column(String(100), nullable=False)
+    cron_expression = Column(String(100), nullable=False)
+    command = Column(String(255), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    description = Column(String(255))
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
 class CurrencyMap(Base):
     __tablename__ = "currency_map"
