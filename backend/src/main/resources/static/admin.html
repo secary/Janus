@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Janus 管理</title>
+    <style>
+      :root {
+        --page-background: #f4f6f8;
+        --surface: #ffffff;
+        --border: #d9dee7;
+        --text: #26313f;
+        --muted: #6b7280;
+        --primary: #176b87;
+        --primary-hover: #12566c;
+        --danger: #c2410c;
+        --success: #047857;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        font-family: "Segoe UI", sans-serif;
+        background: var(--page-background);
+        color: var(--text);
+        line-height: 1.4;
+      }
+
+      .page {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 36px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      nav {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+
+      button,
+      select,
+      input {
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        font: inherit;
+      }
+
+      button {
+        padding: 0 14px;
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+
+      button.secondary {
+        background: #fff;
+        color: var(--primary);
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      #statusText {
+        min-height: 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      #statusText[data-tone="success"] {
+        color: var(--success);
+      }
+
+      #statusText[data-tone="error"] {
+        color: var(--danger);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 960px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: middle;
+        font-size: 14px;
+      }
+
+      th {
+        background: #edf1f5;
+        color: #344054;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      tr:hover td {
+        background: #fafbfc;
+      }
+
+      .job-name {
+        font-weight: 600;
+        margin-bottom: 3px;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nowrap {
+        white-space: nowrap;
+      }
+
+      .enabled-input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+      }
+
+      .cron-control {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) 130px;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .cron-input {
+        width: 100%;
+        min-width: 0;
+        font-family: Consolas, "Courier New", monospace;
+        padding: 0 10px;
+      }
+
+      .cron-input.invalid {
+        border-color: var(--danger);
+        outline: 2px solid rgba(194, 65, 12, 0.14);
+      }
+
+      .preset-select {
+        width: 130px;
+        padding: 0 8px;
+      }
+
+      code {
+        display: block;
+        max-width: 260px;
+        overflow-wrap: anywhere;
+        color: #334155;
+        font-size: 12px;
+      }
+
+      @media (max-width: 700px) {
+        .page {
+          width: min(100% - 20px, 1180px);
+          padding-top: 16px;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page-background: #121212;
+          --surface: #1e1e1e;
+          --border: #3a3a3a;
+          --text: #eceff1;
+          --muted: #a6a6a6;
+          --primary: #4ea4bd;
+          --primary-hover: #3f8fa6;
+          --danger: #fb923c;
+          --success: #34d399;
+        }
+
+        button,
+        select,
+        input {
+          background: #242424;
+          color: var(--text);
+        }
+
+        button {
+          background: var(--primary);
+          color: #071216;
+        }
+
+        button.secondary {
+          background: #242424;
+          color: var(--primary);
+        }
+
+        th {
+          background: #272727;
+          color: #d9e1e8;
+        }
+
+        tr:hover td {
+          background: #232323;
+        }
+
+        code {
+          color: #d1d5db;
+        }
+      }
+    </style>
+    <script type="module" src="/assets/admin.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <h1>Janus 管理</h1>
+        <nav>
+          <a href="/">仪表盘</a>
+          <a href="/history">历史记录</a>
+        </nav>
+      </header>
+
+      <main>
+        <div class="toolbar">
+          <button type="button" id="saveButton">保存配置</button>
+          <button type="button" id="reloadButton" class="secondary">重新加载</button>
+          <span id="statusText" role="status"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table id="scheduleTable">
+            <thead>
+              <tr>
+                <th>任务</th>
+                <th>启用</th>
+                <th>频率</th>
+                <th>命令</th>
+                <th>说明</th>
+                <th>更新时间</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

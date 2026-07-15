@@ -10,4 +10,9 @@ public class PageController {
     public String history() {
         return "forward:/history.html";
     }
+
+    @GetMapping("/admin")
+    public String admin() {
+        return "forward:/admin.html";
+    }
 }

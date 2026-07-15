@@ -28,3 +28,19 @@ export interface LogEntry {
   level: string;
   message: string;
 }
+
+export interface ScheduleConfig {
+  jobKey: string;
+  jobName: string;
+  cronExpression: string;
+  command: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string | null;
+}
+
+export interface ScheduleUpdate {
+  jobKey: string;
+  cronExpression: string;
+  enabled: boolean;
+}
