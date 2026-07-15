@@ -25,7 +25,11 @@ from methods import fetch_history, load_latest_model, scale, preprocess
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from config.settings import get_engine, get_currency_code, CURRENCIES # 你已有这个
-from utils.models import Prediction # 你的 Prediction ORM
+from utils.models import AppConfig, Prediction # 你的 Prediction ORM
+
+
+DEFAULT_PREDICTION_METHOD = "lstm"
+DEFAULT_PREDICTION_HORIZON_DAYS = 7
 
 
 def insert_predictions(df: pd.DataFrame):
@@ -58,6 +62,35 @@ def insert_predictions(df: pd.DataFrame):
         session.rollback()
         logger.error(f"❌ 导入 prediction 表失败: {e}")
 
+    finally:
+        session.close()
+
+
+def load_prediction_config() -> tuple[str, int]:
+    engine = get_engine()
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        rows = session.query(AppConfig).filter(
+            AppConfig.config_key.in_(["prediction_method", "prediction_horizon_days"])
+        ).all()
+        values = {row.config_key: row.config_value for row in rows}
+        method = values.get("prediction_method", DEFAULT_PREDICTION_METHOD)
+        if method not in {"lstm", "last_observed"}:
+            logger.warning(f"⚠️ 不支持的预测方法 {method}，回退到 {DEFAULT_PREDICTION_METHOD}")
+            method = DEFAULT_PREDICTION_METHOD
+
+        try:
+            horizon_days = int(values.get("prediction_horizon_days", DEFAULT_PREDICTION_HORIZON_DAYS))
+        except (TypeError, ValueError):
+            horizon_days = DEFAULT_PREDICTION_HORIZON_DAYS
+
+        horizon_days = min(max(horizon_days, 1), 30)
+        return method, horizon_days
+    except Exception as exc:
+        logger.warning(f"⚠️ 读取预测配置失败，使用默认配置: {exc}")
+        return DEFAULT_PREDICTION_METHOD, DEFAULT_PREDICTION_HORIZON_DAYS
     finally:
         session.close()
 
@@ -100,9 +133,34 @@ def lstm_predict(currency: str, days: int=7):
     
     return df_forecast
 
+
+def last_observed_predict(currency: str, days: int=7):
+    currency = currency.upper()
+    df = preprocess(fetch_history(currency, 30))
+    if df.empty:
+        logger.warning(f"⚠️ {currency}历史数据为空，无法使用 last_observed 预测")
+        return pd.DataFrame()
+
+    seq = 48
+    future_steps = days * seq
+    latest_rate = float(df["Rate"].dropna().iloc[-1])
+    step = pd.Timedelta(minutes=30)
+    future_dates = [df.index[-1] + (i + 1) * step for i in range(future_steps)]
+
+    df_forecast = pd.DataFrame({
+        "Date": future_dates,
+        "Currency": currency,
+        "Predicted_Rates": latest_rate,
+        "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
+    })
+    logger.info(f"🔮 使用 last_observed 生成未来{days}日内{currency}预测，共 {len(df_forecast)} 条")
+    return df_forecast
+
 def main():
     try:
         all_results = []  # ⬅️ 存储所有币种的预测结果
+        prediction_method, horizon_days = load_prediction_config()
+        logger.info(f"当前预测配置：method={prediction_method}, horizon_days={horizon_days}")
 
         for currency in CURRENCIES:
             currency_en = get_currency_code(currency)
@@ -110,11 +168,18 @@ def main():
                 logger.warning(f"⚠️ {currency}未存在于数据库内")
                 continue
 
-            if len(fetch_history(currency_en, 30)) < 500:
+            history_rows = fetch_history(currency_en, 30)
+            if prediction_method == "lstm" and len(history_rows) < 500:
                 logger.warning(f"⚠️ 当前{currency}数据不足，暂不预测")
                 continue
+            if history_rows.empty:
+                logger.warning(f"⚠️ 当前{currency}无历史数据，暂不预测")
+                continue
 
-            result = lstm_predict(currency_en)
+            if prediction_method == "last_observed":
+                result = last_observed_predict(currency_en, horizon_days)
+            else:
+                result = lstm_predict(currency_en, horizon_days)
             if result is not None and not result.empty:
                 all_results.append(result)
             else:
