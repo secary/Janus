@@ -10,6 +10,10 @@ spring:
       static-locations:
         - file:/app/static/
         - classpath:/static/
+      cache:
+        period: 0
+        cachecontrol:
+          no-store: true
 
   datasource:
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:exchange}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai

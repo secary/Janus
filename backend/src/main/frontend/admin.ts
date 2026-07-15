@@ -1,5 +1,10 @@
-import { fetchScheduleConfigs, saveScheduleConfigs } from "./api.js";
-import type { ScheduleConfig, ScheduleUpdate } from "./types";
+import {
+  fetchPredictionConfig,
+  fetchScheduleConfigs,
+  savePredictionConfig,
+  saveScheduleConfigs,
+} from "./api.js";
+import type { PredictionConfig, PredictionMethod, ScheduleConfig, ScheduleUpdate } from "./types";
 
 const cronFieldPattern = /^[0-9A-Za-z*/,-]+$/;
 const cronPresets = [
@@ -12,6 +17,7 @@ const cronPresets = [
 ];
 
 let schedules: ScheduleConfig[] = [];
+let predictionConfig: PredictionConfig | null = null;
 
 function elementById<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -35,8 +41,12 @@ function appendCell(row: HTMLTableRowElement): HTMLTableCellElement {
   return cell;
 }
 
-function setStatus(message: string, tone: "idle" | "success" | "error" = "idle"): void {
-  const status = elementById<HTMLSpanElement>("statusText");
+function setStatus(
+  id: "statusText" | "scheduleStatus" | "predictionStatus",
+  message: string,
+  tone: "idle" | "success" | "error" = "idle",
+): void {
+  const status = elementById<HTMLSpanElement>(id);
   status.textContent = message;
   status.dataset.tone = tone;
 }
@@ -65,6 +75,23 @@ function validateCronExpression(value: string): string {
   return expression;
 }
 
+function validateLimit(input: HTMLInputElement): number {
+  const value = Number.parseInt(input.value, 10);
+  if (!Number.isFinite(value) || value < 1 || value > 10000) {
+    throw new Error("导出条数必须在 1 到 10000 之间");
+  }
+  return value;
+}
+
+function validateHorizonDays(): number {
+  const input = elementById<HTMLInputElement>("predictionHorizon");
+  const value = Number.parseInt(input.value, 10);
+  if (!Number.isFinite(value) || value < 1 || value > 30) {
+    throw new Error("预测天数必须在 1 到 30 之间");
+  }
+  return value;
+}
+
 function findScheduleRow(jobKey: string): HTMLTableRowElement {
   const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>("#scheduleTable tbody tr"));
   const row = rows.find((item) => item.dataset.jobKey === jobKey);
@@ -72,6 +99,23 @@ function findScheduleRow(jobKey: string): HTMLTableRowElement {
     throw new Error(`Missing schedule row: ${jobKey}`);
   }
   return row;
+}
+
+function renderSummary(): void {
+  elementById<HTMLDivElement>("taskCount").textContent = schedules.length ? String(schedules.length) : "-";
+  elementById<HTMLDivElement>("enabledCount").textContent = schedules.length
+    ? String(schedules.filter((item) => item.enabled).length)
+    : "-";
+  elementById<HTMLDivElement>("predictionMethodSummary").textContent = predictionConfig
+    ? displayPredictionMethod(predictionConfig.method)
+    : "-";
+  elementById<HTMLDivElement>("horizonSummary").textContent = predictionConfig
+    ? String(predictionConfig.horizonDays)
+    : "-";
+}
+
+function displayPredictionMethod(method: PredictionMethod): string {
+  return method === "last_observed" ? "Last" : "LSTM";
 }
 
 function renderScheduleRows(data: ScheduleConfig[]): void {
@@ -109,7 +153,6 @@ function renderScheduleRows(data: ScheduleConfig[]): void {
     cronInput.setAttribute("aria-label", `${schedule.jobName} cron 表达式`);
 
     const presetSelect = document.createElement("select");
-    presetSelect.className = "preset-select";
     presetSelect.setAttribute("aria-label", `${schedule.jobName} 常用频率`);
     presetSelect.replaceChildren(
       ...cronPresets.map((preset) => {
@@ -123,18 +166,13 @@ function renderScheduleRows(data: ScheduleConfig[]): void {
       if (presetSelect.value) {
         cronInput.value = presetSelect.value;
         cronInput.classList.remove("invalid");
-        setStatus("");
+        setStatus("statusText", "");
       }
       presetSelect.value = "";
     });
 
     cronGroup.replaceChildren(cronInput, presetSelect);
     cronCell.appendChild(cronGroup);
-
-    const commandCell = appendCell(row);
-    const command = document.createElement("code");
-    command.textContent = schedule.command;
-    commandCell.appendChild(command);
 
     const descriptionCell = appendCell(row);
     descriptionCell.className = "muted";
@@ -148,6 +186,13 @@ function renderScheduleRows(data: ScheduleConfig[]): void {
   });
 
   tbody.replaceChildren(...rows);
+}
+
+function renderPredictionConfig(config: PredictionConfig): void {
+  const methodSelect = elementById<HTMLSelectElement>("predictionMethod");
+  const horizonInput = elementById<HTMLInputElement>("predictionHorizon");
+  methodSelect.value = config.method;
+  horizonInput.value = String(config.horizonDays);
 }
 
 function collectScheduleUpdates(): ScheduleUpdate[] {
@@ -176,53 +221,144 @@ function collectScheduleUpdates(): ScheduleUpdate[] {
   });
 }
 
-async function loadSchedules(): Promise<void> {
+async function loadAdminData(): Promise<void> {
   setLoading(true);
-  setStatus("加载中...");
-  try {
-    schedules = await fetchScheduleConfigs();
+  setStatus("statusText", "加载中...");
+  setStatus("scheduleStatus", "");
+  setStatus("predictionStatus", "");
+
+  const [scheduleResult, predictionResult] = await Promise.allSettled([
+    fetchScheduleConfigs(),
+    fetchPredictionConfig(),
+  ]);
+
+  if (scheduleResult.status === "fulfilled") {
+    schedules = scheduleResult.value;
     renderScheduleRows(schedules);
-    setStatus(`已加载 ${schedules.length} 个任务`, "success");
-  } catch (error) {
+    setStatus("scheduleStatus", `${schedules.length} 个任务`, "success");
+  } else {
+    schedules = [];
     renderScheduleRows([]);
-    const message = error instanceof Error ? error.message : "调度配置加载失败";
-    setStatus(`调度配置加载失败：${message}`, "error");
-  } finally {
-    setLoading(false);
+    setStatus("scheduleStatus", "加载失败", "error");
   }
+
+  if (predictionResult.status === "fulfilled") {
+    predictionConfig = predictionResult.value;
+    renderPredictionConfig(predictionConfig);
+    setStatus("predictionStatus", "已加载", "success");
+  } else {
+    predictionConfig = null;
+    setStatus("predictionStatus", "加载失败", "error");
+  }
+
+  renderSummary();
+  const failures = [scheduleResult, predictionResult].filter((result) => result.status === "rejected");
+  if (failures.length) {
+    const firstFailure = failures[0];
+    const message = firstFailure && firstFailure.status === "rejected" && firstFailure.reason instanceof Error
+      ? firstFailure.reason.message
+      : "配置加载失败";
+    setStatus("statusText", message, "error");
+  } else {
+    setStatus("statusText", "配置已加载", "success");
+  }
+  setLoading(false);
 }
 
-async function saveSchedules(): Promise<void> {
+async function saveAdminData(): Promise<void> {
   let updates: ScheduleUpdate[];
+  let horizonDays: number;
   try {
     updates = collectScheduleUpdates();
+    horizonDays = validateHorizonDays();
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : "配置无效", "error");
+    setStatus("statusText", error instanceof Error ? error.message : "配置无效", "error");
     return;
   }
 
+  const method = elementById<HTMLSelectElement>("predictionMethod").value as PredictionMethod;
   setLoading(true);
-  setStatus("保存中...");
-  try {
-    schedules = await saveScheduleConfigs(updates);
+  setStatus("statusText", "保存中...");
+
+  const [scheduleResult, predictionResult] = await Promise.allSettled([
+    saveScheduleConfigs(updates),
+    savePredictionConfig({ method, horizonDays }),
+  ]);
+
+  if (scheduleResult.status === "fulfilled") {
+    schedules = scheduleResult.value;
     renderScheduleRows(schedules);
-    setStatus("配置已保存", "success");
+    setStatus("scheduleStatus", "已保存", "success");
+  } else {
+    setStatus("scheduleStatus", "保存失败", "error");
+  }
+
+  if (predictionResult.status === "fulfilled") {
+    predictionConfig = predictionResult.value;
+    renderPredictionConfig(predictionConfig);
+    setStatus("predictionStatus", "已保存", "success");
+  } else {
+    setStatus("predictionStatus", "保存失败", "error");
+  }
+
+  renderSummary();
+  const failures = [scheduleResult, predictionResult].filter((result) => result.status === "rejected");
+  if (failures.length) {
+    const firstFailure = failures[0];
+    const message = firstFailure && firstFailure.status === "rejected" && firstFailure.reason instanceof Error
+      ? firstFailure.reason.message
+      : "配置保存失败";
+    setStatus("statusText", message, "error");
+  } else {
+    setStatus("statusText", "配置已保存", "success");
+  }
+  setLoading(false);
+}
+
+function downloadDataExport(): void {
+  try {
+    const dataset = elementById<HTMLSelectElement>("dataExportDataset").value;
+    const currency = elementById<HTMLSelectElement>("dataExportCurrency").value;
+    const limit = validateLimit(elementById<HTMLInputElement>("dataExportLimit"));
+    const query = new URLSearchParams({ dataset, limit: String(limit) });
+    if (currency) {
+      query.set("currency", currency);
+    }
+    window.location.href = `/api/admin/export/data?${query.toString()}`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "配置保存失败";
-    setStatus(`配置保存失败：${message}`, "error");
-  } finally {
-    setLoading(false);
+    setStatus("statusText", error instanceof Error ? error.message : "导出参数无效", "error");
+  }
+}
+
+function downloadLogExport(): void {
+  try {
+    const source = elementById<HTMLSelectElement>("logExportSource").value;
+    const level = elementById<HTMLSelectElement>("logExportLevel").value;
+    const limit = validateLimit(elementById<HTMLInputElement>("logExportLimit"));
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (source) {
+      query.set("source", source);
+    }
+    if (level) {
+      query.set("level", level);
+    }
+    window.location.href = `/api/admin/export/logs?${query.toString()}`;
+  } catch (error) {
+    setStatus("statusText", error instanceof Error ? error.message : "导出参数无效", "error");
   }
 }
 
 window.addEventListener("pageshow", () => {
-  void loadSchedules();
+  void loadAdminData();
 });
 
 elementById<HTMLButtonElement>("saveButton").addEventListener("click", () => {
-  void saveSchedules();
+  void saveAdminData();
 });
 
 elementById<HTMLButtonElement>("reloadButton").addEventListener("click", () => {
-  void loadSchedules();
+  void loadAdminData();
 });
+
+elementById<HTMLButtonElement>("exportDataButton").addEventListener("click", downloadDataExport);
+elementById<HTMLButtonElement>("exportLogsButton").addEventListener("click", downloadLogExport);

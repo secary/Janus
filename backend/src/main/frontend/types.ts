@@ -44,3 +44,16 @@ export interface ScheduleUpdate {
   cronExpression: string;
   enabled: boolean;
 }
+
+export type PredictionMethod = "lstm" | "last_observed";
+
+export interface PredictionConfig {
+  method: PredictionMethod;
+  horizonDays: number;
+  availableMethods: PredictionMethod[];
+}
+
+export interface PredictionConfigUpdate {
+  method: PredictionMethod;
+  horizonDays: number;
+}

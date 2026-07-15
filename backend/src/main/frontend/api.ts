@@ -3,6 +3,8 @@ import type {
   HistoryRow,
   LatestRate,
   LogEntry,
+  PredictionConfig,
+  PredictionConfigUpdate,
   ScheduleConfig,
   ScheduleUpdate,
 } from "./types";
@@ -60,4 +62,12 @@ export function fetchScheduleConfigs(): Promise<ScheduleConfig[]> {
 
 export function saveScheduleConfigs(updates: ScheduleUpdate[]): Promise<ScheduleConfig[]> {
   return postJson<ScheduleConfig[]>("/api/admin/schedules", updates);
+}
+
+export function fetchPredictionConfig(): Promise<PredictionConfig> {
+  return fetchJson<PredictionConfig>("/api/admin/prediction-config");
+}
+
+export function savePredictionConfig(update: PredictionConfigUpdate): Promise<PredictionConfig> {
+  return postJson<PredictionConfig>("/api/admin/prediction-config", update);
 }

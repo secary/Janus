@@ -45,3 +45,9 @@ export function fetchScheduleConfigs() {
 export function saveScheduleConfigs(updates) {
     return postJson("/api/admin/schedules", updates);
 }
+export function fetchPredictionConfig() {
+    return fetchJson("/api/admin/prediction-config");
+}
+export function savePredictionConfig(update) {
+    return postJson("/api/admin/prediction-config", update);
+}
