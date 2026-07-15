@@ -1,3 +1,5 @@
+# Fallback reference only. The worker now generates crontab from the
+# schedule_config database table via /app/scripts/sync_crontab.py.
 */30 * * * * /app/.venv/bin/python /app/main/Janus.py >> /proc/1/fd/1 2>&1
 0 2 * * * /app/.venv/bin/python /app/predictor/Jervis.py >> /proc/1/fd/1 2>&1
 0 3 1 * * /app/.venv/bin/python /app/predictor/tune_lstm.py >> /proc/1/fd/1 2>&1

@@ -3,6 +3,6 @@ set -eu
 
 printenv > /etc/environment
 /app/.venv/bin/python /app/utils/createdb.py
-crontab /app/scripts/exchange-rate.cron
+/app/.venv/bin/python /app/scripts/sync_crontab.py
 
 exec cron -f
