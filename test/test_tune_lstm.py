@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import torch
 
 
-FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecast"
+FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecasting"
 sys.path.insert(0, str(FORECAST_DIR))
 
 import tune_lstm  # noqa: E402

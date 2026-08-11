@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 
-FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecast"
+FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecasting"
 sys.path.insert(0, str(FORECAST_DIR))
 
 import Jervis  # noqa: E402
