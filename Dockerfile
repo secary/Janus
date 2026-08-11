@@ -37,7 +37,7 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY config/ /app/config/
 COPY utils/ /app/utils/
 COPY main/ /app/main/
-COPY forecasting/ /app/forecasting/
+ COPY forecasting/ /app/forecasting/
 RUN mkdir -p /app/data /app/forecasting/models
 COPY scripts/ /app/scripts/
 
