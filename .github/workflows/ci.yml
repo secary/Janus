@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-unit-tests:
+    name: Python unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DB_USER: ci_user
+      DB_PASSWORD: ci_password
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: exchange_ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Sync locked dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Run Python unit tests
+        run: uv run --no-sync python -m unittest discover -s test -p "test_*.py" -v
