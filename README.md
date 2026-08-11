@@ -37,7 +37,7 @@
 ├── uv.lock                  # uv 锁文件
 ├── main/
 │   └── Janus.py
-├── predictor/
+├── forecasting/
 │   ├── Jervis.py
 │   └── tune_lstm.py
 ├── scripts/
@@ -99,8 +99,8 @@ uv run python utils/createdb.py
 
 ```bash
 uv run python main/Janus.py                  # 抓取汇率
-uv run python predictor/Jervis.py            # 执行预测
-uv run python predictor/tune_lstm.py         # 训练模型
+uv run python forecasting/Jervis.py          # 执行预测
+uv run python forecasting/tune_lstm.py       # 训练模型
 ```
 
 ---
@@ -136,8 +136,8 @@ docker compose logs -f mysql
 
 ```bash
 docker compose exec worker python /app/main/Janus.py
-docker compose exec worker python /app/predictor/Jervis.py
-docker compose exec worker python /app/predictor/tune_lstm.py
+docker compose exec worker python /app/forecasting/Jervis.py
+docker compose exec worker python /app/forecasting/tune_lstm.py
 ```
 
 当前容器拆分：
@@ -149,7 +149,7 @@ docker compose exec worker python /app/predictor/tune_lstm.py
 当前已启用的宿主机文件映射：
 
 - `data/`：抓取数据文件
-- `predictor/models/`：训练后的模型文件
+- `forecasting/models/`：训练后的模型文件
 - `mysql-data`：启用容器 MySQL 时使用的 MySQL 数据卷
 
 修改 Spring Boot 或 Python 代码后需要重新构建对应镜像；数据库、数据文件和模型会通过 volume 保留。
@@ -191,8 +191,8 @@ docker compose up -d --build --remove-orphans
 
 ```cron
 */30 * * * * /app/.venv/bin/python /app/main/Janus.py
-0 2 * * * /app/.venv/bin/python /app/predictor/Jervis.py
-0 3 1 * * /app/.venv/bin/python /app/predictor/tune_lstm.py
+0 2 * * * /app/.venv/bin/python /app/forecasting/Jervis.py
+0 3 1 * * /app/.venv/bin/python /app/forecasting/tune_lstm.py
 ```
 
 分别对应：
