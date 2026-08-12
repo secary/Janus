@@ -14,7 +14,8 @@ venv/
 .env.*
 backend/
 web/
-data/
+data/*
+!data/schema.sql
 predictor/models/
 
 # VCS and editor noise
