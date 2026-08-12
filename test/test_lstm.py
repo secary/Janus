@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 import torch
 
-from forecasting.models.lstm import RateLSTM
+from app.models.lstm import RateLSTM
 
 
 class RateLSTMTests(unittest.TestCase):

@@ -1,16 +1,11 @@
-import sys
 import unittest
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import torch
 
 
-FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecasting"
-sys.path.insert(0, str(FORECAST_DIR))
-
-import tune_lstm  # noqa: E402
+from main import tune_lstm
 
 
 class GridSearchTests(unittest.TestCase):

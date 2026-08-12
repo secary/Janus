@@ -12,8 +12,8 @@ def import_janus():
         SimpleNamespace(name_cn="美元", code_en="USD"),
     ]
     with patch("sqlalchemy.orm.sessionmaker", return_value=lambda: fake_session):
-        sys.modules.pop("main.Janus", None)
-        return importlib.import_module("main.Janus")
+        sys.modules.pop("Janus", None)
+        return importlib.import_module("Janus")
 
 
 class GetExchangeRateTests(unittest.TestCase):
