@@ -60,6 +60,8 @@ MySQL prediction 表 -------------> Spring Boot API / 前端预测展示
 ├── docker/
 │   ├── docker-entrypoint.sh       # worker 初始化数据库并启动 cron
 │   └── docker-cron.cron           # 定时任务配置
+├── e2e/
+│   └── e2e_check.py               # Docker 端到端检查脚本
 ├── test/                          # Python 业务逻辑单元测试
 ├── Dockerfile                     # Python worker 镜像
 ├── docker-compose.yaml            # API 与 worker 编排
@@ -236,6 +238,20 @@ docker compose ps
 docker compose logs -f api
 docker compose logs -f worker
 ```
+
+执行不写入业务数据库的 Docker 端到端检查：
+
+```bash
+python e2e/e2e_check.py
+```
+
+默认流程构建镜像、启动 API，并通过一次性 worker 容器校验 cron 和统一任务入口；它会绕过 worker 正式 entrypoint，不执行数据库初始化或抓取，因此脚本本身不会向业务表写入数据。如果执行前已有正式 worker 在运行，其 cron 仍可能独立入库，脚本会输出警告但不会擅自停止服务。需要验证真实抓取和入库链路时显式执行：
+
+```bash
+python e2e/e2e_check.py --with-write
+```
+
+写入模式会启动正式 worker、初始化数据库并执行一次抓取。脚本默认对应 Compose 服务 `worker`、`api` 和实际容器 `janus-app`、`janus-backend`。两种模式都不会删除容器或数据卷。可通过 `COMPOSE`、`WORKER_SERVICE`、`API_SERVICE`、`WORKER_CONTAINER`、`API_CONTAINER`、`API_URL` 和 `E2E_TIMEOUT` 环境变量覆盖默认配置。
 
 手动触发 worker 任务：
 

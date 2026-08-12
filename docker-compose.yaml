@@ -1,6 +1,6 @@
 
 services:
-  api:
+  backend:
     build:
       context: ./backend
       dockerfile: ./Dockerfile
@@ -17,7 +17,7 @@ services:
       - "host.docker.internal:host-gateway"
     restart: always
 
-  worker:
+  app:
     build:
       context: .
       dockerfile: ./Dockerfile
