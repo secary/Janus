@@ -36,9 +36,7 @@ class GetExchangeRateTests(unittest.TestCase):
         </tr></table>
         """
         with patch.object(self.janus, "askurl", return_value=html):
-            result = self.janus.get_exchange_rate(
-                "https://example.test", ["美元"]
-            )
+            result = self.janus.get_exchange_rate("https://example.test", ["美元"])
 
         self.assertEqual(
             result,
@@ -47,9 +45,7 @@ class GetExchangeRateTests(unittest.TestCase):
 
     def test_returns_empty_result_when_request_fails(self):
         with patch.object(self.janus, "askurl", return_value=None):
-            result = self.janus.get_exchange_rate(
-                "https://example.test", ["美元"]
-            )
+            result = self.janus.get_exchange_rate("https://example.test", ["美元"])
 
         self.assertEqual(result, {})
 

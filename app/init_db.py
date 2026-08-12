@@ -4,7 +4,6 @@ from pathlib import Path
 
 from app.config import get_engine
 
-
 SCHEMA_FILE = Path(__file__).resolve().parents[1] / "data" / "schema.sql"
 
 

@@ -1,11 +1,15 @@
 import torch
-import torch.nn as nn
+from torch import nn
+
 from .base import BasePredictor
+
 
 class RateLSTM(nn.Module, BasePredictor):
     def __init__(self, input_dim=1, hidden_dim=64, num_layers=2, dropout=0.2):
         super().__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
+        self.lstm = nn.LSTM(
+            input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout
+        )
         self.fc = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
@@ -19,7 +23,10 @@ class RateLSTM(nn.Module, BasePredictor):
         self.train()
         for _ in range(epochs):
             for i in range(0, len(X), batch_size):
-                xb, yb = X[i:i+batch_size].to(device), y[i:i+batch_size].to(device)
+                xb, yb = (
+                    X[i : i + batch_size].to(device),
+                    y[i : i + batch_size].to(device),
+                )
                 optimizer.zero_grad()
                 loss = criterion(self(xb), yb)
                 loss.backward()

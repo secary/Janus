@@ -3,8 +3,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-
-
 from main import Jervis
 
 
@@ -37,7 +35,9 @@ class PredictionOrchestrationTests(unittest.TestCase):
         with (
             patch.object(Jervis, "CURRENCIES", ["美元"]),
             patch.object(Jervis, "get_currency_code", return_value="USD"),
-            patch.object(Jervis, "fetch_history", return_value=pd.DataFrame(index=range(499))),
+            patch.object(
+                Jervis, "fetch_history", return_value=pd.DataFrame(index=range(499))
+            ),
             patch.object(Jervis, "lstm_predict") as predict,
             patch.object(Jervis, "insert_predictions") as insert,
         ):
@@ -58,7 +58,9 @@ class PredictionOrchestrationTests(unittest.TestCase):
         with (
             patch.object(Jervis, "CURRENCIES", ["美元"]),
             patch.object(Jervis, "get_currency_code", return_value="USD"),
-            patch.object(Jervis, "fetch_history", return_value=pd.DataFrame(index=range(500))),
+            patch.object(
+                Jervis, "fetch_history", return_value=pd.DataFrame(index=range(500))
+            ),
             patch.object(Jervis, "lstm_predict", return_value=forecast),
             patch.object(Jervis, "insert_predictions") as insert,
         ):

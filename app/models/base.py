@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+
 import torch
+
 
 class BasePredictor(ABC):
     @abstractmethod

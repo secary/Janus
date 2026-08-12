@@ -1,7 +1,6 @@
 """Compatibility entry point for :mod:`app.fetcher`."""
 
-from app.fetcher import *  # noqa: F401,F403
-
+from app.fetcher import *
 
 if __name__ == "__main__":
     main()

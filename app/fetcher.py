@@ -1,20 +1,22 @@
 import os
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import uuid
-import time
 import random
+import time
 import traceback
-import pandas as pd
-import urllib.request
 import urllib.error
+import urllib.request
+import uuid
+
+import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from app.logger_config import trace_ids
-from app.config import WEBSITE, CURRENCIES, CSV_FILE
+from app.config import CSV_FILE, CURRENCIES, WEBSITE
 from app.db import fetch_currency_map, upsert_history
+from app.logger_config import trace_ids
 
 # 设置 trace_id（在初始化前设定）
 trace_id = os.getenv("TRACE_ID_JANUS") or f"JANUS-{uuid.uuid4()}"
@@ -25,25 +27,27 @@ logger = logger.bind(name="janus", trace_id=trace_id)
 
 CN2EN = fetch_currency_map()
 
+
 def askurl(url, timeout=15, retries=3, delay=10):
     import socket
+
     socket.setdefaulttimeout(timeout)
 
     USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64)...',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
-    'Mozilla/5.0 (X11; Linux x86_64)...']
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+        "Mozilla/5.0 (X11; Linux x86_64)...",
+    ]
 
-    
     for attempt in range(1, retries + 1):
         user_agent = random.choice(USER_AGENTS)
-        headers = {'User-Agent': user_agent}
+        headers = {"User-Agent": user_agent}
         request = urllib.request.Request(url, headers=headers)
 
         try:
             logger.debug(f" 第 {attempt} 次尝试，URL: {url}, UA: {user_agent}")
             response = urllib.request.urlopen(request, timeout=timeout)
-            html = response.read().decode('utf-8')
+            html = response.read().decode("utf-8")
             logger.debug(f" ✅ 成功，第 {attempt} 次，请求状态码: {response.getcode()}")
             return html
 
@@ -65,6 +69,7 @@ def askurl(url, timeout=15, retries=3, delay=10):
     logger.error(f" ❌ 所有 {retries} 次尝试均失败，放弃请求。")
     return None
 
+
 def get_exchange_rate(url, currencies, save_html=False):
     if not isinstance(currencies, list):
         logger.error("❌ currencies 参数必须是一个列表")
@@ -74,29 +79,26 @@ def get_exchange_rate(url, currencies, save_html=False):
     if not html:
         logger.error("❌ 未能获取 HTML 内容")
         return {}
-    
+
     soup = BeautifulSoup(html, "html.parser")
     result = {}
 
     for currency in currencies:
-        target_td = soup.find('td', string=currency)
+        target_td = soup.find("td", string=currency)
         if target_td:
-            row = target_td.find_parent('tr')
-            row_data = [td.get_text(strip=True) for td in row.find_all('td')]
+            row = target_td.find_parent("tr")
+            row_data = [td.get_text(strip=True) for td in row.find_all("td")]
             name_cn = row_data[0]
             name_en = CN2EN.get(name_cn, name_cn)
-            result[name_en] = {
-                "现汇卖出价": row_data[3],
-                "日期": row_data[6]
-            }
-        
+            result[name_en] = {"现汇卖出价": row_data[3], "日期": row_data[6]}
+
         else:
             logger.warning(f"❌ 未找到包含 '{currency}' 的 <td> 标签")
-            
+
     if save_html:
         timestamp = time.strftime("%Y%m%d_%H%M%S")  # 正确、安全的时间格式
-        file = f'source_{timestamp}.html'
-        path = os.path.join('data', 'source', file)
+        file = f"source_{timestamp}.html"
+        path = os.path.join("data", "source", file)
         os.makedirs(os.path.dirname(path), exist_ok=True)  # 确保目录存在
         with open(path, "w", encoding="utf-8") as f:
             f.write(html)
@@ -114,7 +116,7 @@ def store_data(data_dict):
             "Date": pd.to_datetime(data.get("日期"), errors="coerce"),
             "Currency": currency,
             "Rate": float(data.get("现汇卖出价")),
-            "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
+            "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()),
         }
         all_data.append(row)
 
@@ -142,10 +144,11 @@ def store_data(data_dict):
     except Exception as e:
         logger.exception(f"❌ 其他错误: {e}")
 
+
 def main():
     try:
         logger.info(f"⚓ 开始抓取人民币兑换 {', '.join(CURRENCIES)} 汇率数据")
-        
+
         rates_data = get_exchange_rate(WEBSITE, CURRENCIES)
         if not rates_data:
             logger.warning("⚠️ 未获取任何汇率数据")
@@ -161,7 +164,8 @@ def main():
     except Exception as e:
         logger.exception(f"❌ 出现错误：{e}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     logger.info("Janus、了解！任せなさい！")
     main()
     logger.complete()

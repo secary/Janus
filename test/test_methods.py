@@ -3,8 +3,6 @@ import unittest
 import numpy as np
 import pandas as pd
 import torch
-
-
 from main import methods
 
 

@@ -3,8 +3,6 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import torch
-
-
 from main import tune_lstm
 
 
@@ -16,11 +14,16 @@ class GridSearchTests(unittest.TestCase):
         second_model = MagicMock()
         first_model.to.return_value = first_model
         second_model.to.return_value = second_model
-        first_model.predict.return_value = torch.tensor([[17.0], [17.0], [17.0], [17.0]])
+        first_model.predict.return_value = torch.tensor(
+            [[17.0], [17.0], [17.0], [17.0]]
+        )
         second_model.predict.return_value = targets[-4:].clone()
 
-        with TemporaryDirectory() as directory, patch.object(
-            tune_lstm, "RateLSTM", side_effect=[first_model, second_model]
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(
+                tune_lstm, "RateLSTM", side_effect=[first_model, second_model]
+            ),
         ):
             result = tune_lstm.grid_search_lstm(
                 X=features,

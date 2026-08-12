@@ -1,29 +1,34 @@
 import os
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from loguru import logger
 import uuid
+
+from loguru import logger
+
 from app.logger_config import trace_ids
+
 # 设置 trace_id（独立运行时使用 uuid；也支持从环境变量传入）
 trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"
 trace_ids["jervis"].set(trace_id)
 
 # ✅ 绑定 loguru 的 name 字段，用于日志分类输出
-logger = logger.bind(name="jervis",trace_id=trace_id)
+logger = logger.bind(name="jervis", trace_id=trace_id)
 
 # 获取项目根目录（Jervis.py 所在目录的上一级）
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models", "RateLSTM")
 
-import pandas as pd
-import numpy as np
-import torch
 import time
 
-from app.methods import fetch_history, load_latest_model, scale, preprocess
-from app.config import get_currency_code, CURRENCIES
+import numpy as np
+import pandas as pd
+import torch
+
+from app.config import CURRENCIES, get_currency_code
 from app.db import upsert_predictions
+from app.methods import fetch_history, load_latest_model, preprocess, scale
 
 
 def insert_predictions(df: pd.DataFrame):
@@ -46,13 +51,13 @@ def insert_predictions(df: pd.DataFrame):
         logger.error(f"❌ 导入 prediction 表失败: {e}")
 
 
-def lstm_predict(currency: str, days: int=7):
+def lstm_predict(currency: str, days: int = 7):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_latest_model(MODEL_DIR, currency, device)
 
     currency = currency.upper()
     df = preprocess(fetch_history(currency, 30))
-    data = scale(df[['Rate']])
+    data = scale(df[["Rate"]])
 
     seq = 48
     # Generate future predictions
@@ -71,18 +76,21 @@ def lstm_predict(currency: str, days: int=7):
     future_scaled = np.array(future_scaled).reshape(-1, 1)
     future = scale(future_scaled, inverse=True)
     step = df.index[1] - df.index[0]
-    future_dates = [df.index[-1] + (i+1)*step for i in range(future_steps)]
+    future_dates = [df.index[-1] + (i + 1) * step for i in range(future_steps)]
 
-    df_forecast = pd.DataFrame({
-        "Date": future_dates,
-        "Currency": currency,
-        "Predicted_Rates": future.flatten(),
-        "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
-    })
-    
+    df_forecast = pd.DataFrame(
+        {
+            "Date": future_dates,
+            "Currency": currency,
+            "Predicted_Rates": future.flatten(),
+            "Locals": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()),
+        }
+    )
+
     logger.info(f"🔮 未来{days}日内{currency}汇率预测完成，共 {len(df_forecast)} 条")
-    
+
     return df_forecast
+
 
 def main():
     try:
@@ -110,7 +118,7 @@ def main():
             # ✍️ 写入数据库
             insert_predictions(merged_df)
         else:
-                logger.warning("⚠️ 没有任何币种的预测结果被生成")
+            logger.warning("⚠️ 没有任何币种的预测结果被生成")
 
     except Exception as e:
         logger.exception(f"❌ 出现错误：{e}")
@@ -120,4 +128,3 @@ if __name__ == "__main__":
     logger.info("Nice to meet you. Lucky Jervis、来たわ!")
     main()
     logger.complete()
-   
