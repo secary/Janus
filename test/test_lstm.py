@@ -1,5 +1,6 @@
 import unittest
 from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock
 
 import torch
 
@@ -36,6 +37,35 @@ class RateLSTMTests(unittest.TestCase):
             source.parameters(), target.parameters(), strict=True
         ):
             torch.testing.assert_close(source_parameter, target_parameter)
+
+    def test_tune_selects_configuration_with_lowest_validation_mse(self):
+        features = torch.arange(40, dtype=torch.float32).reshape(20, 2, 1)
+        targets = torch.arange(20, dtype=torch.float32).reshape(20, 1)
+        first_model = MagicMock()
+        second_model = MagicMock()
+        first_model.to.return_value = first_model
+        second_model.to.return_value = second_model
+        first_model.predict.return_value = torch.full((4, 1), 17.0)
+        second_model.predict.return_value = targets[-4:].clone()
+
+        models = iter([first_model, second_model])
+        with TemporaryDirectory() as directory:
+            result = RateLSTM.tune(
+                X=features,
+                y=targets,
+                currency="USD",
+                device="cpu",
+                epoch_candidates=[1],
+                batch_candidates=[4],
+                lr_candidates=[0.1, 0.01],
+                save_dir=directory,
+                model_factory=lambda: next(models),
+            )
+
+        self.assertEqual(result["lr"], 0.01)
+        self.assertEqual(result["val_mse"], 0.0)
+        first_model.save.assert_called_once()
+        second_model.save.assert_called_once()
 
 
 if __name__ == "__main__":

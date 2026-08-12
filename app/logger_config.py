@@ -21,7 +21,7 @@ from app.config import get_engine
 # 基础配置
 # ===============================
 
-# LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 # os.makedirs(LOG_DIR, exist_ok=True)
 
 engine = get_engine()
@@ -61,7 +61,7 @@ def safe_sink(msg):
 # ===============================
 
 
-def file_sink_factory(module_prefix, LOG_DIR=os.path.join(BASE_DIR, "logs")):
+def file_sink_factory(module_prefix, log_dir=LOG_DIR):
     def sink(msg):
         record = msg.record
         if record["extra"].get("name") != module_prefix:
@@ -75,7 +75,7 @@ def file_sink_factory(module_prefix, LOG_DIR=os.path.join(BASE_DIR, "logs")):
             f"[{trace_id}]: {record['message']}\n"
         )
 
-        log_file = os.path.join(LOG_DIR, f"{module_prefix.capitalize()}.log")
+        log_file = os.path.join(log_dir, f"{module_prefix.capitalize()}.log")
 
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_line)
@@ -120,7 +120,7 @@ def db_worker():
                         batch,
                     )
                     session.commit()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - logging here would recurse
                 pass  # ❗ 不能打日志（避免递归）
 
             batch.clear()
@@ -166,7 +166,7 @@ def db_sink(msg):
                 },
             )
             session.commit()
-    except:
+    except Exception:  # noqa: BLE001, S110 - logging here would recurse
         pass
 
 
@@ -189,7 +189,6 @@ GLOBAL_LOGGER = logger
 # ===============================
 # trace_id 查询工具（保留）
 # ===============================
-
 
 
 def find_logs_by_trace_id(trace_id: str):

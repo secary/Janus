@@ -1,8 +1,23 @@
 """Raw SQL database access for the worker."""
 
+from pathlib import Path
+
 from sqlalchemy import text
 
 from app.config import get_engine
+
+SCHEMA_FILE = Path(__file__).resolve().parents[1] / "data" / "schema.sql"
+
+
+def initialize_database(schema_file: Path = SCHEMA_FILE):
+    sql = schema_file.read_text(encoding="utf-8")
+    statements = [
+        statement.strip() for statement in sql.split(";") if statement.strip()
+    ]
+    with get_engine().begin() as connection:
+        for statement in statements:
+            connection.exec_driver_sql(statement)
+    print(f"DB initialization complete: {len(statements)} statements")
 
 
 def fetch_currency_map():
@@ -36,15 +51,21 @@ def upsert_history(rows):
 
 
 def fetch_history(currency: str, start_time):
+    conditions = ["Currency = :currency"]
+    parameters = {"currency": currency.upper()}
+    if start_time is not None:
+        conditions.append("`Date` >= :start_time")
+        parameters["start_time"] = start_time
+
     with get_engine().connect() as connection:
         rows = connection.execute(
-            text("""
+            text(f"""
                 SELECT `Date`, Currency, Rate, Locals
                 FROM history
-                WHERE Currency = :currency AND `Date` >= :start_time
+                WHERE {" AND ".join(conditions)}
                 ORDER BY `Date` ASC
             """),
-            {"currency": currency.upper(), "start_time": start_time},
+            parameters,
         ).mappings()
         return list(rows)
 
@@ -62,3 +83,7 @@ def upsert_predictions(rows):
             """),
             rows,
         )
+
+
+if __name__ == "__main__":
+    initialize_database()

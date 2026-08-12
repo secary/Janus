@@ -14,7 +14,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from app.config import CSV_FILE, CURRENCIES, WEBSITE
+from app.config import CURRENCIES, WEBSITE
 from app.db import fetch_currency_map, upsert_history
 from app.logger_config import trace_ids
 
@@ -124,25 +124,11 @@ def store_data(data_dict):
         logger.warning("未抓取到任何数据，无法存储。")
         return
 
-    df_new = pd.DataFrame(all_data)
-
-    if os.path.exists(CSV_FILE):
-        df_existing = pd.read_csv(CSV_FILE)
-        df_updated = pd.concat([df_existing, df_new], ignore_index=True)
-    else:
-        df_updated = df_new
-
-    # try:
-    #     df_updated.to_csv(CSV_FILE, index=False)
-    #     logger.info(f"✅ 数据成功存储到 {CSV_FILE}")
-    # except Exception as e:
-    #     logger.error(f"❌ csv保存错误: {e}")
-
     try:
         upsert_history(all_data)
         logger.info("✅ 数据成功更新到 exchange.history 数据库表")
-    except Exception as e:
-        logger.exception(f"❌ 其他错误: {e}")
+    except Exception:
+        logger.exception("❌ 数据库写入错误")
 
 
 def main():
@@ -161,8 +147,8 @@ def main():
         df = pd.DataFrame(rates_data)
         print(f"当前汇率：\n{df}")
 
-    except Exception as e:
-        logger.exception(f"❌ 出现错误：{e}")
+    except Exception:
+        logger.exception("❌ 抓取任务执行错误")
 
 
 if __name__ == "__main__":

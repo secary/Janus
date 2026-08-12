@@ -16,7 +16,7 @@ logger = logger.bind(name="jervis")
 trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"
 trace_ids["jervis"].set(trace_id)
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -34,7 +34,11 @@ def fetch_history(currency: str | None = None, days: int | None = None) -> pd.Da
     返回最近 30 天的 History 记录，结果为 Pandas DataFrame。
     """
     currency = currency.upper()
-    start_time = datetime.now() - timedelta(days=days) if days else datetime.min
+    start_time = (
+        (datetime.now(UTC) - timedelta(days=days)).replace(tzinfo=None)
+        if days
+        else None
+    )
     return pd.DataFrame(fetch_history_rows(currency, start_time))
 
 
@@ -96,9 +100,9 @@ def load_latest_model(
 
     if not latest_file:
         logger.error(f"⚠️ 未找到 {currency} 模型，尝试自动训练...")
-        from main import tune_lstm
+        from app.train import train_currency
 
-        tune_lstm.tune(currency)  # 自动训练
+        train_currency("lstm", currency)
         latest_file = find_latest_file()
 
         if not latest_file:

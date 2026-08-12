@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 import pandas as pd
 import torch
-from main import methods
+
+from app import methods
 
 
 class SequenceTests(unittest.TestCase):

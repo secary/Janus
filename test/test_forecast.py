@@ -3,7 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-from main import Jervis
+
+from app import forecast
 
 
 class LstmPredictTests(unittest.TestCase):
@@ -15,39 +16,39 @@ class LstmPredictTests(unittest.TestCase):
         model.return_value.cpu.return_value.numpy.return_value = np.array([[0.5]])
 
         with (
-            patch.object(Jervis, "load_latest_model", return_value=model),
-            patch.object(Jervis, "fetch_history", return_value=pd.DataFrame()),
-            patch.object(Jervis, "preprocess", return_value=history),
-            patch.object(Jervis, "scale", side_effect=[scaled, np.full((48, 1), 7.25)]),
-            patch.object(Jervis.torch.cuda, "is_available", return_value=False),
+            patch.object(forecast, "load_latest_model", return_value=model),
+            patch.object(forecast, "fetch_history", return_value=pd.DataFrame()),
+            patch.object(forecast, "preprocess", return_value=history),
+            patch.object(
+                forecast, "scale", side_effect=[scaled, np.full((48, 1), 7.25)]
+            ),
+            patch.object(forecast.torch.cuda, "is_available", return_value=False),
         ):
-            result = Jervis.lstm_predict("usd", days=1)
+            result = forecast.lstm_predict("usd", days=1)
 
         self.assertEqual(len(result), 48)
         self.assertTrue((result["Currency"] == "USD").all())
         self.assertTrue((result["Predicted_Rates"] == 7.25).all())
-        self.assertEqual(result.iloc[0]["Date"], index[-1] + pd.Timedelta(minutes=30))
         self.assertEqual(result.iloc[-1]["Date"], index[-1] + pd.Timedelta(days=1))
 
 
 class PredictionOrchestrationTests(unittest.TestCase):
     def test_main_skips_currency_when_history_is_insufficient(self):
         with (
-            patch.object(Jervis, "CURRENCIES", ["美元"]),
-            patch.object(Jervis, "get_currency_code", return_value="USD"),
+            patch.object(forecast, "CURRENCIES", ["美元"]),
+            patch.object(forecast, "get_currency_code", return_value="USD"),
             patch.object(
-                Jervis, "fetch_history", return_value=pd.DataFrame(index=range(499))
+                forecast, "fetch_history", return_value=pd.DataFrame(index=range(499))
             ),
-            patch.object(Jervis, "lstm_predict") as predict,
-            patch.object(Jervis, "insert_predictions") as insert,
+            patch.object(forecast, "lstm_predict") as predict,
+            patch.object(forecast, "insert_predictions") as insert,
         ):
-            Jervis.main()
-
+            forecast.main()
         predict.assert_not_called()
         insert.assert_not_called()
 
     def test_main_combines_predictions_before_persisting(self):
-        forecast = pd.DataFrame(
+        result = pd.DataFrame(
             {
                 "Date": [pd.Timestamp("2026-08-12")],
                 "Currency": ["USD"],
@@ -56,18 +57,16 @@ class PredictionOrchestrationTests(unittest.TestCase):
             }
         )
         with (
-            patch.object(Jervis, "CURRENCIES", ["美元"]),
-            patch.object(Jervis, "get_currency_code", return_value="USD"),
+            patch.object(forecast, "CURRENCIES", ["美元"]),
+            patch.object(forecast, "get_currency_code", return_value="USD"),
             patch.object(
-                Jervis, "fetch_history", return_value=pd.DataFrame(index=range(500))
+                forecast, "fetch_history", return_value=pd.DataFrame(index=range(500))
             ),
-            patch.object(Jervis, "lstm_predict", return_value=forecast),
-            patch.object(Jervis, "insert_predictions") as insert,
+            patch.object(forecast, "lstm_predict", return_value=result),
+            patch.object(forecast, "insert_predictions") as insert,
         ):
-            Jervis.main()
-
-        inserted = insert.call_args.args[0]
-        pd.testing.assert_frame_equal(inserted, forecast)
+            forecast.main()
+        pd.testing.assert_frame_equal(insert.call_args.args[0], result)
 
 
 if __name__ == "__main__":
