@@ -2,37 +2,37 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-import Janus
+import janus
 
 
 class SchedulerTests(unittest.TestCase):
     def test_dispatches_selected_task(self):
         task = MagicMock()
         with (
-            patch.object(sys, "argv", ["Janus", "predict"]),
-            patch.dict(Janus.TASKS, {"predict": task}),
+            patch.object(sys, "argv", ["janus", "predict"]),
+            patch.dict(janus.TASKS, {"predict": task}),
         ):
-            Janus.main()
+            janus.main()
 
         task.assert_called_once_with()
 
     def test_passes_model_name_to_training_task(self):
         task = MagicMock()
         with (
-            patch.object(sys, "argv", ["Janus", "train", "chronos"]),
-            patch.dict(Janus.TASKS, {"train": task}),
+            patch.object(sys, "argv", ["janus", "train", "chronos"]),
+            patch.dict(janus.TASKS, {"train": task}),
         ):
-            Janus.main()
+            janus.main()
 
         task.assert_called_once_with("chronos")
 
     def test_passes_model_name_to_tuning_task(self):
         task = MagicMock()
         with (
-            patch.object(sys, "argv", ["Janus", "tune", "chronos"]),
-            patch.dict(Janus.TASKS, {"tune": task}),
+            patch.object(sys, "argv", ["janus", "tune", "chronos"]),
+            patch.dict(janus.TASKS, {"tune": task}),
         ):
-            Janus.main()
+            janus.main()
 
         task.assert_called_once_with("chronos")
 

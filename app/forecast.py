@@ -15,7 +15,7 @@ from app.logger_config import trace_ids
 from app.methods import fetch_history, load_latest_model, preprocess, scale
 
 MODEL_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "models", "RateLSTM"
+    os.path.dirname(os.path.abspath(__file__)), "models", "rate_lstm"
 )
 
 trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"

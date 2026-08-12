@@ -25,7 +25,7 @@ def tune_lstm(currency: str):
         y=y_train,
         currency=currency,
         device=device,
-        save_dir=os.path.join(MODEL_DIR, "RateLSTM"),
+        save_dir=os.path.join(MODEL_DIR, "rate_lstm"),
     )
 
 

@@ -35,7 +35,7 @@ COPY pyproject.toml uv.lock /app/
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY app/ /app/app/
-COPY Janus.py /app/Janus.py
+COPY janus.py /app/janus.py
 COPY data/schema.sql /app/data/schema.sql
 RUN mkdir -p /app/app/models
 COPY docker/ /app/docker/
