@@ -4,35 +4,28 @@
 *pytest_cache*
 .venv
 
-# docker
-# *docker*
 Janus-dockers
-
-# env
 *.env*
 !.env.example
 
-# log
 logs
 *.log
-
-# data
-data
 *.csv
-*.pth
-*.sql
+*.session.sql
 *.txt
-notebook/
 .claude
-
-
-# dev
 .vscode
+
 *debug*
 *draft*
+
 web/scripts
 *crontab.txt
 web/scripts
+
 *notifier.py
+
 .DS_Store
 *run*.sh
+
+.pre-commit-cache

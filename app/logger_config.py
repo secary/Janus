@@ -1,26 +1,27 @@
-from loguru import logger
 import os
 import sys
+
+from loguru import logger
 
 # ⭐ 加这一段（关键）
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 
 import contextvars
-from datetime import datetime
-from sqlalchemy.orm import sessionmaker
 import json
-from queue import Queue, Empty
 import threading
 import time
+from queue import Empty, Queue
 
-from config.settings import get_engine  # 现在不会报错了
+from sqlalchemy.orm import sessionmaker
+
+from app.config import get_engine
 
 # ===============================
 # 基础配置
 # ===============================
 
-# LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 # os.makedirs(LOG_DIR, exist_ok=True)
 
 engine = get_engine()
@@ -41,6 +42,7 @@ trace_ids = {
 # 控制台 sink
 # ===============================
 
+
 def safe_sink(msg):
     record = msg.record
     module_name = record["extra"].get("name", "unknown")
@@ -53,11 +55,13 @@ def safe_sink(msg):
 
     print(log_line, end="", file=sys.stderr if record["level"].no >= 30 else sys.stdout)
 
+
 # ===============================
 # 文件 sink
 # ===============================
 
-def file_sink_factory(module_prefix, LOG_DIR=os.path.join(BASE_DIR, "logs")):
+
+def file_sink_factory(module_prefix, log_dir=LOG_DIR):
     def sink(msg):
         record = msg.record
         if record["extra"].get("name") != module_prefix:
@@ -71,18 +75,20 @@ def file_sink_factory(module_prefix, LOG_DIR=os.path.join(BASE_DIR, "logs")):
             f"[{trace_id}]: {record['message']}\n"
         )
 
-        log_file = os.path.join(LOG_DIR, f"{module_prefix.capitalize()}.log")
+        log_file = os.path.join(log_dir, f"{module_prefix.capitalize()}.log")
 
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_line)
 
     return sink
 
+
 # ===============================
 # ⭐ DB 批量队列（核心优化）
 # ===============================
 
 log_queue = Queue(maxsize=10000)
+
 
 def db_worker():
     """后台线程：批量写数据库"""
@@ -111,14 +117,15 @@ def db_worker():
                             :log_type, :message, :extra
                         )
                         """,
-                        batch
+                        batch,
                     )
                     session.commit()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - logging here would recurse
                 pass  # ❗ 不能打日志（避免递归）
 
             batch.clear()
             last_flush = time.time()
+
 
 # 启动后台线程
 threading.Thread(target=db_worker, daemon=True).start()
@@ -128,12 +135,13 @@ threading.Thread(target=db_worker, daemon=True).start()
 # ===============================
 from sqlalchemy import text
 
+
 def db_sink(msg):
     record = msg.record
 
     module_name = record["extra"].get("name", "unknown")
 
-    trace_id = record["extra"].get("trace_id") 
+    trace_id = record["extra"].get("trace_id")
 
     try:
         with Session() as session:
@@ -154,12 +162,14 @@ def db_sink(msg):
                     "source": module_name,
                     "log_type": record["extra"].get("type", "system"),
                     "message": record["message"],
-                    "extra": json.dumps(record["extra"], ensure_ascii=False)
-                }
+                    "extra": json.dumps(record["extra"], ensure_ascii=False),
+                },
             )
             session.commit()
-    except:
+    except Exception:  # noqa: BLE001, S110 - logging here would recurse
         pass
+
+
 # ===============================
 # logger 初始化
 # ===============================
@@ -180,7 +190,6 @@ GLOBAL_LOGGER = logger
 # trace_id 查询工具（保留）
 # ===============================
 
-from glob import glob
 
 def find_logs_by_trace_id(trace_id: str):
     with engine.connect() as conn:
@@ -191,7 +200,7 @@ def find_logs_by_trace_id(trace_id: str):
                 WHERE trace_id = :trace_id
                 ORDER BY timestamp ASC
             """),
-            {"trace_id": trace_id}
+            {"trace_id": trace_id},
         )
 
         return result.fetchall()

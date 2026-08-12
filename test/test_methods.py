@@ -1,16 +1,10 @@
-import sys
 import unittest
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
 
-
-FORECAST_DIR = Path(__file__).resolve().parents[1] / "forecasting"
-sys.path.insert(0, str(FORECAST_DIR))
-
-import methods  # noqa: E402
+from app import methods
 
 
 class SequenceTests(unittest.TestCase):

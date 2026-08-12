@@ -4,8 +4,8 @@ services:
     build:
       context: ./backend
       dockerfile: ./Dockerfile
-    image: janus-api
-    container_name: janus-api
+    image: janus-backend
+    container_name: janus-backend
     ports:
       - "8080:8080"
     env_file:
@@ -21,8 +21,8 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-    image: janus-worker
-    container_name: janus-worker
+    image: janus-app
+    container_name: janus-app
     env_file:
       - .env
     environment:
@@ -32,6 +32,6 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
-      - ./forecasting/models:/app/forecasting/models
-      - ./scripts:/app/scripts:ro
+      - ./app/models:/app/app/models
+      - ./docker:/app/docker:ro
     restart: always
