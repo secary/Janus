@@ -32,6 +32,6 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
-      - ./forecasting/models:/app/forecasting/models
-      - ./scripts:/app/scripts:ro
+      - ./app/models:/app/app/models
+      - ./docker:/app/docker:ro
     restart: always

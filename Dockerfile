@@ -34,13 +34,12 @@ ENV TZ=Asia/Shanghai \
 COPY pyproject.toml uv.lock /app/
 RUN uv sync --frozen --no-install-project --no-dev
 
-COPY config/ /app/config/
-COPY utils/ /app/utils/
-COPY main/ /app/main/
- COPY forecasting/ /app/forecasting/
-RUN mkdir -p /app/data /app/forecasting/models
-COPY scripts/ /app/scripts/
+COPY app/ /app/app/
+COPY Janus.py /app/Janus.py
+COPY data/schema.sql /app/data/schema.sql
+RUN mkdir -p /app/app/models
+COPY docker/ /app/docker/
 
-RUN chmod +x /app/scripts/worker-entrypoint.sh
+RUN chmod +x /app/docker/docker-entrypoint.sh
 
-CMD ["sh", "/app/scripts/worker-entrypoint.sh"]
+CMD ["sh", "/app/docker/docker-entrypoint.sh"]

@@ -17,12 +17,9 @@ logs
 *.log
 
 # data
-data
 *.csv
-*.pth
-*.sql
+*.session.sql
 *.txt
-notebook/
 .claude
 
 
