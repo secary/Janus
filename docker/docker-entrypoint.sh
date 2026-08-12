@@ -2,7 +2,7 @@
 set -eu
 
 printenv > /etc/environment
-/app/.venv/bin/python -m app.init_db
+/app/.venv/bin/python -m app.db
 crontab /app/docker/docker-cron.cron
 
 exec cron -f
