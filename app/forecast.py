@@ -2,25 +2,21 @@
 
 import os
 import time
-import uuid
 
 import numpy as np
 import pandas as pd
 import torch
-from loguru import logger
 
 from app.config import CURRENCIES, get_currency_code
 from app.db import upsert_predictions
-from app.logger_config import trace_ids
+from app.logger_config import get_logger
 from app.methods import fetch_history, load_latest_model, preprocess, scale
 
 MODEL_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "models", "rate_lstm"
 )
 
-trace_id = os.getenv("TRACE_ID_JERVIS") or f"JERVIS-{uuid.uuid4()}"
-trace_ids["jervis"].set(trace_id)
-logger = logger.bind(name="jervis", trace_id=trace_id)
+logger = get_logger("janus")
 
 
 def insert_predictions(df: pd.DataFrame):
