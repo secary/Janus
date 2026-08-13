@@ -8,22 +8,15 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-import uuid
 
 import pandas as pd
 from bs4 import BeautifulSoup
-from loguru import logger
 
 from app.config import CURRENCIES, WEBSITE
 from app.db import fetch_currency_map, upsert_history
-from app.logger_config import trace_ids
+from app.logger_config import get_logger
 
-# 设置 trace_id（在初始化前设定）
-trace_id = os.getenv("TRACE_ID_JANUS") or f"JANUS-{uuid.uuid4()}"
-trace_ids["janus"].set(trace_id)
-
-# 绑定 loguru logger（重要：为日志分类添加标识）
-logger = logger.bind(name="janus", trace_id=trace_id)
+logger = get_logger("janus")
 
 CN2EN = fetch_currency_map()
 
